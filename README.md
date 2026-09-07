@@ -67,3 +67,5 @@ Day 30: 1 Month! Yipeee, today I made the ui cuter for collect_words.py, re-imag
 Day 31: Break
 
 Day 32: Added arm tracking, tomorrow I'll look into making this an app & adding a few words.
+
+Day 33: I added words & emotions today! 
