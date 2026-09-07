@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import mediapipe as mp
 import mediapipe.python.solutions.face_mesh as mp_face_mesh
+import mediapipe.python.solutions.pose as mp_pose
 import time
 import csv
 import os
@@ -43,6 +44,10 @@ KEY_FACE_INDICES = [
     78, 308, 82, 312
 ]
 
+# 11: lshoulder, 12: rshoulder, 13: lelbow, 14: relbow, 15: lwrist, 16: rwrist
+KEY_ARM_INDICES = [11, 12, 13, 14, 15, 16]
+ARM_CONNECTIONS = [(11, 12), (11, 13), (13, 15), (12, 14), (14, 16)]
+
 def draw_rounded_rect(img, pt1, pt2, color, thickness=-1, radius=15):
     x1, y1 = pt1
     x2, y2 = pt2
@@ -81,6 +86,20 @@ def extract_face_features(face_landmarks):
         lm = face_landmarks[idx]
         face_feats.extend([lm.x - nose_tip[0], lm.y - nose_tip[1], lm.z - nose_tip[2]])
     return face_feats
+
+def extract_arm_features(pose_landmarks):
+    if not pose_landmarks:
+        return [0.0] * (len(KEY_ARM_INDICES) * 3)
+    
+    ls = pose_landmarks[11]
+    rs = pose_landmarks[12]
+    shoulder_center = np.array([(ls.x + rs.x) / 2.0, (ls.y + rs.y) / 2.0, (ls.z + rs.z) / 2.0])
+    
+    arm_feats = []
+    for idx in KEY_ARM_INDICES:
+        lm = pose_landmarks[idx]
+        arm_feats.extend([lm.x - shoulder_center[0], lm.y - shoulder_center[1], lm.z - shoulder_center[2]])
+    return arm_feats
 
 def is_valid_hand_shape(landmarks):
     wrist = np.array([landmarks[0].x, landmarks[0].y])
@@ -134,10 +153,18 @@ def main():
         min_tracking_confidence=0.50
     )
 
+    pose_tracker = mp_pose.Pose(
+        static_image_mode=False,
+        model_complexity=1,
+        min_detection_confidence=0.50,
+        min_tracking_confidence=0.50
+    )
+
     dummy_pts = np.zeros((21, 3))
     num_hand_features = len(extract_hand_features(dummy_pts))
     num_face_features = len(KEY_FACE_INDICES) * 3
-    num_features_per_frame = num_hand_features + num_face_features
+    num_arm_features = len(KEY_ARM_INDICES) * 3
+    num_features_per_frame = num_hand_features + num_face_features + num_arm_features
 
     frames_per_sample = 30
     target_total_features = frames_per_sample * num_features_per_frame
@@ -188,7 +215,6 @@ def main():
             draw_alpha_card(frame, (20, 20), (480, 115), COLOR_CARD_BG, alpha=0.75, radius=18)
             draw_rounded_rect(frame, (20, 20), (480, 115), COLOR_PINK, thickness=2, radius=18)
             
-            # target label badge
             draw_rounded_rect(frame, (35, 32), (150, 60), COLOR_PINK, thickness=-1, radius=10)
             cv2.putText(frame, "TARGET", (50, 52), cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLOR_BG_DARK, 2, cv2.LINE_AA)
             cv2.putText(frame, word_to_record, (165, 55), cv2.FONT_HERSHEY_SIMPLEX, 0.75, COLOR_WHITE, 2, cv2.LINE_AA)
@@ -202,7 +228,6 @@ def main():
             cv2.putText(frame, "|", (355, 678), cv2.FONT_HERSHEY_SIMPLEX, 0.55, COLOR_GRAY, 1, cv2.LINE_AA)
             cv2.putText(frame, "[Q] Quit", (375, 678), cv2.FONT_HERSHEY_SIMPLEX, 0.55, COLOR_YELLOW, 2, cv2.LINE_AA)
 
-            # alert notification toast
             if time.time() < status_timer:
                 draw_alpha_card(frame, (20, 130), (500, 175), COLOR_CARD_BG, alpha=0.85, radius=12)
                 draw_rounded_rect(frame, (20, 130), (500, 175), COLOR_CORAL, thickness=2, radius=12)
@@ -248,6 +273,7 @@ def main():
                 frame_timestamp_ms = last_timestamp_ms + 1
             last_timestamp_ms = frame_timestamp_ms
 
+            # Hand tracking
             detection_result = detector.detect_for_video(mp_image, frame_timestamp_ms)
             hand_feats = None
             if detection_result.hand_landmarks:
@@ -270,6 +296,7 @@ def main():
             if hand_feats is None:
                 hand_feats = [0.0] * num_hand_features
 
+            #face tracking
             face_results = face_mesh.process(rgb_frame)
             face_lms = face_results.multi_face_landmarks[0].landmark if face_results.multi_face_landmarks else None
             face_feats = extract_face_features(face_lms)
@@ -279,13 +306,27 @@ def main():
                     lm = face_lms[idx]
                     cv2.circle(frame, (int(lm.x * w), int(lm.y * h)), 2, COLOR_MINT, -1, cv2.LINE_AA)
 
-            frame_feats = list(hand_feats) + list(face_feats)
+            #arm tracking
+            pose_results = pose_tracker.process(rgb_frame)
+            pose_lms = pose_results.pose_landmarks.landmark if pose_results.pose_landmarks else None
+            arm_feats = extract_arm_features(pose_lms)
+
+            if pose_lms:
+                for conn in ARM_CONNECTIONS:
+                    p1, p2 = pose_lms[conn[0]], pose_lms[conn[1]]
+                    pt1 = (int(p1.x * w), int(p1.y * h))
+                    pt2 = (int(p2.x * w), int(p2.y * h))
+                    cv2.line(frame, pt1, pt2, COLOR_CORAL, 2, cv2.LINE_AA)
+                for idx in KEY_ARM_INDICES:
+                    lm = pose_lms[idx]
+                    cv2.circle(frame, (int(lm.x * w), int(lm.y * h)), 4, COLOR_YELLOW, -1, cv2.LINE_AA)
+
+            frame_feats = list(hand_feats) + list(face_feats) + list(arm_feats)
             sequence_features.extend(frame_feats)
 
             recorded_frames = len(sequence_features) // num_features_per_frame
             ratio = recorded_frames / frames_per_sample
 
-            # recording card & rounded progress bar
             draw_alpha_card(frame, (20, 20), (520, 120), COLOR_CARD_BG, alpha=0.85, radius=18)
             draw_rounded_rect(frame, (20, 20), (520, 120), COLOR_CORAL, thickness=2, radius=18)
             

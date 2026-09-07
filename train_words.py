@@ -26,11 +26,14 @@ KEY_FACE_INDICES = [
     78, 308, 82, 312
 ]
 
+KEY_ARM_INDICES = [11, 12, 13, 14, 15, 16]
+
 def get_expected_feature_counts():
     dummy_pts = np.zeros((21, 3))
     num_hand_features = len(extract_hand_features(dummy_pts))
     num_face_features = len(KEY_FACE_INDICES) * 3
-    num_features_per_frame = num_hand_features + num_face_features
+    num_arm_features = len(KEY_ARM_INDICES) * 3
+    num_features_per_frame = num_hand_features + num_face_features + num_arm_features
     expected_total_vals = FRAMES_PER_SAMPLE * num_features_per_frame
     return num_features_per_frame, expected_total_vals
 
@@ -57,7 +60,6 @@ def augment_sequence(seq_matrix):
     scale = np.random.uniform(0.95, 1.05)
     augmented.append(aggregate_sequence(seq * scale))
 
-    # speed warping
     indices_fast = np.linspace(0, FRAMES_PER_SAMPLE - 1, FRAMES_PER_SAMPLE, dtype=int)
     shift = np.random.choice([-1, 1], size=FRAMES_PER_SAMPLE)
     indices_warped = np.clip(indices_fast + shift, 0, FRAMES_PER_SAMPLE - 1)
@@ -100,7 +102,7 @@ def load_dataset(csv_path="asl_words.csv"):
                 features.append(feat_vec)
 
     if skipped_rows > 0:
-        print(f"[warning] skipped {skipped_rows} incompatible rows.")
+        print(f"[warning] skipped {skipped_rows} incompatible rows due to dimension mismatch.")
 
     if not labels:
         print("error: no valid data rows match target feature size.")
