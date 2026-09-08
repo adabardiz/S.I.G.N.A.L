@@ -171,12 +171,14 @@ def main():
 
     csv_file = "asl_words.csv"
     if os.path.exists(csv_file):
-        with open(csv_file, mode="r", encoding="utf-8") as f:
-            existing_rows = sum(1 for _ in f)
-        print(f"found existing '{csv_file}' with {existing_rows} rows.")
+        try:
+            with open(csv_file, mode="r", encoding="utf-8", errors="ignore") as f:
+                existing_rows = sum(1 for _ in f)
+            print(f"found existing '{csv_file}' with {existing_rows} rows.")
+        except Exception as e:
+            print(f"[warning] could not read '{csv_file}' due to file lock: {e}")
     else:
         print(f"'{csv_file}' not found. initializing new file on first save.")
-
     word_input = input("\nenter word to record (e.g. HELLO, SAD(e), or DONE/FINISH): ").strip()
     if not word_input:
         print("empty input. exiting.")
