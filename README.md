@@ -71,3 +71,5 @@ Day 31: Break
 Day 32: Added arm tracking, tomorrow I'll look into making this an app & adding a few words.
 
 Day 33: I added words & emotions today! Tomorrow I'll add more words.
+
+Day 34: Added more words, tomorrow I'll add words again & try to figure out git lfs as I'm unable to push the updated models. I also updated collect_words.py and train_words.py today.
