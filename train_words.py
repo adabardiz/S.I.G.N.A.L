@@ -4,6 +4,7 @@ import os
 import csv
 import numpy as np
 import joblib
+import re
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
@@ -56,7 +57,6 @@ def augment_sequence(seq_matrix):
     noise = np.random.normal(0, 0.004, seq.shape)
     augmented.append(aggregate_sequence(seq + noise))
     
-    # scale jitter
     scale = np.random.uniform(0.95, 1.05)
     augmented.append(aggregate_sequence(seq * scale))
 
@@ -122,6 +122,9 @@ def main():
         return
 
     unique_classes, counts = np.unique(y, return_counts=True)
+    canonical_words = set(re.sub(r'(_v\d+|_var\d+|_\d+)$', '', label, flags=re.IGNORECASE) for label in unique_classes)
+    
+    print(f"[info] Trained {len(unique_classes)} total sign gesture variations representing {len(canonical_words)} unique target words.")
     print("\nclasses & sample counts:")
     for cls, cnt in zip(unique_classes, counts):
         print(f" - {cls}: {cnt} samples")

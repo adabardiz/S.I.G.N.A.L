@@ -44,7 +44,6 @@ KEY_FACE_INDICES = [
     78, 308, 82, 312
 ]
 
-# 11: lshoulder, 12: rshoulder, 13: lelbow, 14: relbow, 15: lwrist, 16: rwrist
 KEY_ARM_INDICES = [11, 12, 13, 14, 15, 16]
 ARM_CONNECTIONS = [(11, 12), (11, 13), (13, 15), (12, 14), (14, 16)]
 
@@ -134,6 +133,11 @@ def delete_last_csv_row(filepath):
         print(f"[error] failed deleting last csv row: {e}")
         return False
 
+def get_clean_label_input():
+    print("\n--- RECORDING NEW SIGN VARIANT ---")
+    word = input("Enter word name (e.g. 'THANK_YOU' or 'THANK_YOU_v2' for variant 2): ").strip().upper()
+    return word
+
 def main():
     base_options = python.BaseOptions(model_asset_path="hand_landmarker.task")
     options = vision.HandLandmarkerOptions(
@@ -179,7 +183,8 @@ def main():
             print(f"[warning] could not read '{csv_file}' due to file lock: {e}")
     else:
         print(f"'{csv_file}' not found. initializing new file on first save.")
-    word_input = input("\nenter word to record (e.g. HELLO, SAD(e), or DONE/FINISH): ").strip()
+        
+    word_input = get_clean_label_input()
     if not word_input:
         print("empty input. exiting.")
         return
@@ -213,7 +218,6 @@ def main():
                 continue
             frame = cv2.flip(frame, 1)
 
-            # header info card
             draw_alpha_card(frame, (20, 20), (480, 115), COLOR_CARD_BG, alpha=0.75, radius=18)
             draw_rounded_rect(frame, (20, 20), (480, 115), COLOR_PINK, thickness=2, radius=18)
             
@@ -222,7 +226,6 @@ def main():
             cv2.putText(frame, word_to_record, (165, 55), cv2.FONT_HERSHEY_SIMPLEX, 0.75, COLOR_WHITE, 2, cv2.LINE_AA)
             cv2.putText(frame, f"sample {sample_idx + 1} / {samples_to_collect}", (35, 95), cv2.FONT_HERSHEY_SIMPLEX, 0.55, COLOR_LAVENDER, 1, cv2.LINE_AA)
 
-            # bottom controls card
             draw_alpha_card(frame, (20, 640), (580, 700), COLOR_CARD_BG, alpha=0.75, radius=15)
             cv2.putText(frame, "[S] Record", (40, 678), cv2.FONT_HERSHEY_SIMPLEX, 0.55, COLOR_MINT, 2, cv2.LINE_AA)
             cv2.putText(frame, "|", (165, 678), cv2.FONT_HERSHEY_SIMPLEX, 0.55, COLOR_GRAY, 1, cv2.LINE_AA)
@@ -275,7 +278,6 @@ def main():
                 frame_timestamp_ms = last_timestamp_ms + 1
             last_timestamp_ms = frame_timestamp_ms
 
-            # Hand tracking
             detection_result = detector.detect_for_video(mp_image, frame_timestamp_ms)
             hand_feats = None
             if detection_result.hand_landmarks:
@@ -298,7 +300,6 @@ def main():
             if hand_feats is None:
                 hand_feats = [0.0] * num_hand_features
 
-            #face tracking
             face_results = face_mesh.process(rgb_frame)
             face_lms = face_results.multi_face_landmarks[0].landmark if face_results.multi_face_landmarks else None
             face_feats = extract_face_features(face_lms)
@@ -308,7 +309,6 @@ def main():
                     lm = face_lms[idx]
                     cv2.circle(frame, (int(lm.x * w), int(lm.y * h)), 2, COLOR_MINT, -1, cv2.LINE_AA)
 
-            #arm tracking
             pose_results = pose_tracker.process(rgb_frame)
             pose_lms = pose_results.pose_landmarks.landmark if pose_results.pose_landmarks else None
             arm_feats = extract_arm_features(pose_lms)
