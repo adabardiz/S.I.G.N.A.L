@@ -30,32 +30,32 @@ COLOR_SAND = (180, 210, 230)
 COLOR_OVERLAY_BG = (250, 250, 250)
 
 HAND_CONNECTIONS = [
-    (0, 1), (1, 2), (2, 3), (3, 4),         # thumb
-    (5, 6), (6, 7), (7, 8),                 # index finger
-    (9, 10), (10, 11), (11, 12),            # middle finger
-    (13, 14), (14, 15), (15, 16),           # ring finger
-    (17, 18), (18, 19), (19, 20),           # pinky finger
-    (0, 5), (5, 9), (9, 13), (13, 17), (0, 17) # palm base
+    (0, 1), (1, 2), (2, 3), (3, 4),
+    (5, 6), (6, 7), (7, 8),
+    (9, 10), (10, 11), (11, 12),
+    (13, 14), (14, 15), (15, 16),
+    (17, 18), (18, 19), (19, 20),
+    (0, 5), (5, 9), (9, 13), (13, 17), (0, 17)
 ]
 
 KEY_FACE_INDICES = [
-    1,                  # nose tip anchor point
-    33, 133, 159, 145,  # left eye bounds
-    362, 263, 386, 374, # right eye bounds
-    70, 63, 105, 66,    # left eyebrow
-    300, 293, 334, 296, # right eyebrow
+    1,
+    33, 133, 159, 145,
+    362, 263, 386, 374,
+    70, 63, 105, 66,
+    300, 293, 334, 296,
     61, 291, 0, 17, 13, 14,
-    78, 308, 82, 312    # lip curvature
+    78, 308, 82, 312
 ]
 
 KEY_ARM_INDICES = [
-    11, 12, # left and right shoulders
-    13, 14, # left and right elbows
-    15, 16  # left and right wrists
+    11, 12,
+    13, 14,
+    15, 16
 ]
 
 ARM_CONNECTIONS = [
-    (11, 12), # shoulder line
+    (11, 12),
     (11, 13), (13, 15), 
     (12, 14), (14, 16) 
 ]
@@ -94,14 +94,12 @@ def calculate_facial_intensity(face_landmarks):
         lm = face_landmarks[idx]
         return np.array([lm.x, lm.y])
 
-    # normalize distance using outer eye span as base face scale
     left_eye_outer = get_pt(33)
     right_eye_outer = get_pt(263)
     face_scale = np.linalg.norm(left_eye_outer - right_eye_outer)
     if face_scale == 0:
         return 1.0, "NEUTRAL"
 
-    # distance measurements normalized by face scale
     upper_lip = get_pt(13)
     lower_lip = get_pt(14)
     mouth_height = np.linalg.norm(upper_lip - lower_lip) / face_scale
@@ -118,12 +116,10 @@ def calculate_facial_intensity(face_landmarks):
     neutral_eyebrow = 0.22
     neutral_eye = 0.12
 
-    # calculate relative displacement deltas
     mouth_delta = max(0.0, mouth_height - neutral_mouth)
     eyebrow_delta = abs(eyebrow_dist - neutral_eyebrow)
     eye_delta = max(0.0, eye_openness - neutral_eye)
 
-    # weight deltas to scores
     raw_score = (mouth_delta * 2.5) + (eyebrow_delta * 3.0) + (eye_delta * 2.0)
     intensity_multiplier = 1.0 + min(max(raw_score, 0.0), 1.5)
 
@@ -261,7 +257,6 @@ def on_mouse_click(event, x, y, flags, param):
 def main():
     global mouse_click_pos
 
-    # load trained model files
     asl_word_model = None
     if os.path.exists("asl_word_model.pkl"):
         asl_word_model = joblib.load("asl_word_model.pkl")
@@ -512,7 +507,6 @@ def main():
         pose_lms = pose_results.pose_landmarks.landmark if pose_results.pose_landmarks else None
         arm_feats = extract_arm_features(pose_lms)
 
-        # render arm tracking overlay
         if pose_lms:
             for start_idx, end_idx in ARM_CONNECTIONS:
                 s_lm = pose_lms[start_idx]
@@ -615,7 +609,6 @@ def main():
                             if predicted_word:
                                 word_str = str(predicted_word).strip()
                                 
-                                # detect and strip emotion tag (e)
                                 is_emotion_word = False
                                 if "(e)" in word_str.lower():
                                     is_emotion_word = True
@@ -641,7 +634,6 @@ def main():
         else:
             letter_hold_start_time, current_holding_letter = None, None
 
-        # render UI controls
         rec_bg = COLOR_SAGE if not is_recording else COLOR_ROSE
         rec_txt_color = (255, 255, 255)
         rec_btn_text = "STOP" if is_recording else "START"
@@ -654,7 +646,6 @@ def main():
         draw_pill_button(frame, (w - 270, 20), (w - 150, 55), COLOR_SAND, "DELETE", text_color=COLOR_TEXT_DARK, font_scale=0.55)
         draw_pill_button(frame, (w - 140, 20), (w - 20, 55), COLOR_ROSE, "CLEAR", text_color=(255, 255, 255), font_scale=0.55)
 
-        # instructions panel
         box_x1, box_y1 = w - 300, 75
         box_x2, box_y2 = w - 20, 310
         draw_rounded_rect(frame, (box_x1, box_y1), (box_x2, box_y2), COLOR_BG_CARD, thickness=-1, radius=12)
@@ -681,7 +672,6 @@ def main():
             else:
                 cv2.putText(frame, line_text, (box_x1 + 14, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.40, COLOR_TEXT_MUTED, 1, cv2.LINE_AA)
 
-        # status cards
         draw_rounded_rect(frame, (20, 20), (220, 65), COLOR_BG_CARD, thickness=-1, radius=10)
         draw_rounded_rect(frame, (20, 20), (220, 65), COLOR_BORDER, thickness=1, radius=10)
         cv2.putText(frame, "CURRENT SIGN", (32, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.38, COLOR_TEXT_MUTED, 1, cv2.LINE_AA)
@@ -692,7 +682,6 @@ def main():
         cv2.putText(frame, "VOICE ENGINE", (242, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.38, COLOR_TEXT_MUTED, 1, cv2.LINE_AA)
         cv2.putText(frame, f"{tts.current_voice_label}", (242, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TERRACOTTA, 2, cv2.LINE_AA)
 
-        # facial expression intensity card
         draw_rounded_rect(frame, (440, 20), (640, 65), COLOR_BG_CARD, thickness=-1, radius=10)
         draw_rounded_rect(frame, (440, 20), (640, 65), COLOR_BORDER, thickness=1, radius=10)
         cv2.putText(frame, "EMOTION INTENSITY", (452, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.38, COLOR_TEXT_MUTED, 1, cv2.LINE_AA)
@@ -705,7 +694,6 @@ def main():
             disp_word = f"{current_word}_" if current_word else "..."
             cv2.putText(frame, disp_word, (32, 138), cv2.FONT_HERSHEY_SIMPLEX, 0.9, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
 
-        # letter and word detection progress bars
         if is_recording and not open_hand and not space_gesture_detected and hand_detected and not selecting_synonym:
             if current_mode == "SPELL" and current_holding_letter and current_holding_letter != "-" and letter_hold_start_time:
                 letter_elapsed = min(time.time() - letter_hold_start_time, HOLD_LETTER_DURATION)
@@ -719,7 +707,6 @@ def main():
                 cv2.putText(frame, f"Capturing gesture ({buf_len}/30)...", (20, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLOR_TEXT_DARK, 1, cv2.LINE_AA)
                 draw_progress_bar(frame, (20, 188), (220, 200), w_ratio, color=COLOR_SAGE)
 
-        # word intent / synonym selection modal
         if selecting_synonym:
             box_w, box_h = 520, 160
             m_x1, m_y1 = cx - box_w // 2, cy - box_h // 2
@@ -740,7 +727,6 @@ def main():
                 opt2 = synonym_options[1]
                 draw_pill_button(frame, (cx + 10, cy - 10), (cx + 210, cy - 10 + btn_h), COLOR_TERRACOTTA, opt2, text_color=(255, 255, 255), font_scale=0.6)
 
-        # punctuation selection modal
         if selecting_punctuation:
             box_w, box_h = 700, 180
             m_x1, m_y1 = cx - box_w // 2, cy - box_h // 2
@@ -782,7 +768,6 @@ def main():
                 draw_pill_button(frame, (cx - 200, cy - 10), (cx - 10, cy + 50), COLOR_SAND, "Surprised", text_color=COLOR_TEXT_DARK, font_scale=0.55)
                 draw_pill_button(frame, (cx + 10, cy - 10), (cx + 200, cy + 50), COLOR_TERRACOTTA, "Sarcastic", text_color=(255, 255, 255), font_scale=0.55)
 
-        # tense transformation modal
         if selecting_tense:
             box_w, box_h = 520, 180
             m_x1, m_y1 = cx - box_w // 2, cy - box_h // 2
@@ -799,7 +784,6 @@ def main():
             draw_pill_button(frame, (cx - 210, cy + 50), (cx - 10, cy + 95), COLOR_SAND, "FUTURE", text_color=COLOR_TEXT_DARK, font_scale=0.5)
             draw_pill_button(frame, (cx + 10, cy + 50), (cx + 210, cy + 95), COLOR_ROSE, "ORIGINAL", text_color=(255, 255, 255), font_scale=0.5)
 
-        # finished translation action modal
         if not is_recording and finished_word and not selecting_punctuation and not selecting_tense:
             box_w, box_h = 650, 120
             m_x1, m_y1 = cx - box_w // 2, cy + 10
