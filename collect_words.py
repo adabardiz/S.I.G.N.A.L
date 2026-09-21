@@ -24,6 +24,7 @@ COLOR_CORAL = (140, 140, 255)
 COLOR_YELLOW = (170, 235, 255)
 COLOR_WHITE = (245, 245, 245)
 COLOR_GRAY = (120, 110, 125)
+COLOR_OVERLAY_BG = (40, 30, 45)
 
 HAND_CONNECTIONS = [
     (0, 1), (1, 2), (2, 3), (3, 4),
@@ -47,11 +48,18 @@ KEY_FACE_INDICES = [
 KEY_ARM_INDICES = [11, 12, 13, 14, 15, 16]
 ARM_CONNECTIONS = [(11, 12), (11, 13), (13, 15), (12, 14), (14, 16)]
 
+mouse_click_pos = None
+
+def on_mouse_click(event, x, y, flags, param):
+    global mouse_click_pos
+    if event == cv2.EVENT_LBUTTONDOWN:
+        mouse_click_pos = (x, y)
+
 def draw_rounded_rect(img, pt1, pt2, color, thickness=-1, radius=15):
     x1, y1 = pt1
     x2, y2 = pt2
     w, h = x2 - x1, y2 - y1
-    radius = min(radius, w // 2, h // 2)
+    radius = min(radius, abs(w) // 2, abs(h) // 2)
 
     if thickness < 0:
         cv2.rectangle(img, (x1 + radius, y1), (x2 - radius, y2), color, -1)
@@ -74,6 +82,15 @@ def draw_alpha_card(img, pt1, pt2, color, alpha=0.70, radius=15):
     overlay = img.copy()
     draw_rounded_rect(overlay, pt1, pt2, color, thickness=-1, radius=radius)
     cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
+
+def draw_pill_button(img, pt1, pt2, bg_color, text, text_color=(245, 245, 245), font_scale=0.55):
+    draw_rounded_rect(img, pt1, pt2, bg_color, thickness=-1, radius=12)
+    draw_rounded_rect(img, pt1, pt2, COLOR_PINK, thickness=1, radius=12)
+    t_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 2)[0]
+    cx = (pt1[0] + pt2[0]) // 2
+    cy = (pt1[1] + pt2[1]) // 2
+    cv2.putText(img, text, (cx - t_size[0] // 2, cy + t_size[1] // 2),
+                cv2.FONT_HERSHEY_SIMPLEX, font_scale, text_color, 2, cv2.LINE_AA)
 
 def extract_face_features(face_landmarks):
     if not face_landmarks:
@@ -139,6 +156,8 @@ def get_clean_label_input():
     return word
 
 def main():
+    global mouse_click_pos
+
     base_options = python.BaseOptions(model_asset_path="hand_landmarker.task")
     options = vision.HandLandmarkerOptions(
         base_options=base_options, 
@@ -200,6 +219,10 @@ def main():
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
+    window_name = "word data collector"
+    cv2.namedWindow(window_name)
+    cv2.setMouseCallback(window_name, on_mouse_click)
+
     start_time_ms = int(time.time() * 1000)
     last_timestamp_ms = 0
 
@@ -209,6 +232,7 @@ def main():
     sample_idx = 0
     status_msg = ""
     status_timer = 0
+    confirm_delete = False
 
     while sample_idx < samples_to_collect:
         ready_to_record = False
@@ -217,6 +241,8 @@ def main():
             if not ret or frame is None:
                 continue
             frame = cv2.flip(frame, 1)
+            h, w, _ = frame.shape
+            cx, cy = w // 2, h // 2
 
             draw_alpha_card(frame, (20, 20), (480, 115), COLOR_CARD_BG, alpha=0.75, radius=18)
             draw_rounded_rect(frame, (20, 20), (480, 115), COLOR_PINK, thickness=2, radius=18)
@@ -238,26 +264,68 @@ def main():
                 draw_rounded_rect(frame, (20, 130), (500, 175), COLOR_CORAL, thickness=2, radius=12)
                 cv2.putText(frame, f"~ {status_msg}", (35, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.55, COLOR_YELLOW, 2, cv2.LINE_AA)
 
-            cv2.imshow("word data collector", frame)
             key = cv2.waitKey(1) & 0xFF
-            if key == ord('s'):
-                ready_to_record = True
-                break
-            elif key == ord('d'):
-                if sample_idx > 0:
+
+            if confirm_delete:
+                box_w, box_h = 500, 170
+                m_x1, m_y1 = cx - box_w // 2, cy - box_h // 2
+                m_x2, m_y2 = cx + box_w // 2, cy + box_h // 2
+
+                draw_alpha_card(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_OVERLAY_BG, alpha=0.92, radius=16)
+                draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_PINK, thickness=2, radius=16)
+
+                msg = "Are you sure you want to delete this?"
+                t_size = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+                cv2.putText(frame, msg, (cx - t_size[0] // 2, cy - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLOR_WHITE, 2, cv2.LINE_AA)
+
+                yes_p1, yes_p2 = (cx - 150, cy + 15), (cx - 30, cy + 60)
+                no_p1, no_p2 = (cx + 30, cy + 15), (cx + 150, cy + 60)
+
+                draw_pill_button(frame, yes_p1, yes_p2, COLOR_CORAL, "YES [Y]")
+                draw_pill_button(frame, no_p1, no_p2, COLOR_GRAY, "NO [N]")
+
+                yes_clicked = False
+                no_clicked = False
+
+                if mouse_click_pos is not None:
+                    mx, my = mouse_click_pos
+                    mouse_click_pos = None
+                    if yes_p1[0] <= mx <= yes_p2[0] and yes_p1[1] <= my <= yes_p2[1]:
+                        yes_clicked = True
+                    elif no_p1[0] <= mx <= no_p2[0] and no_p1[1] <= my <= no_p2[1]:
+                        no_clicked = True
+
+                if key == ord('y') or yes_clicked:
                     if delete_last_csv_row(csv_file):
                         sample_idx -= 1
                         status_msg = f"deleted sample {sample_idx + 1}"
                     else:
                         status_msg = "could not delete sample from csv"
-                else:
-                    status_msg = "no recorded samples in current session"
-                status_timer = time.time() + 3.0
-            elif key == ord('q'):
-                print("\ncollection cancelled.")
-                cap.release()
-                cv2.destroyAllWindows()
-                return
+                    status_timer = time.time() + 3.0
+                    confirm_delete = False
+                elif key == ord('n') or no_clicked:
+                    confirm_delete = False
+
+            else:
+                if mouse_click_pos is not None:
+                    mouse_click_pos = None
+
+                if key == ord('s'):
+                    ready_to_record = True
+                    break
+                elif key == ord('d'):
+                    if sample_idx > 0:
+                        confirm_delete = True
+                    else:
+                        status_msg = "no recorded samples in current session"
+                        status_timer = time.time() + 3.0
+                elif key == ord('q'):
+                    print("\ncollection cancelled.")
+                    cap.release()
+                    cv2.destroyAllWindows()
+                    return
+
+            cv2.imshow(window_name, frame)
 
         if not ready_to_record:
             break
@@ -342,7 +410,7 @@ def main():
             if fill_w > 18:
                 draw_rounded_rect(frame, (bar_x1, bar_y1), (bar_x1 + fill_w, bar_y2), COLOR_CORAL, thickness=-1, radius=9)
 
-            cv2.imshow("word data collector", frame)
+            cv2.imshow(window_name, frame)
             cv2.waitKey(20)
 
         sample_row = [word_to_record] + sequence_features
