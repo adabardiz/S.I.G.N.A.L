@@ -79,3 +79,5 @@ Day 35: I unfortunately have some business abroad so updates will be limited for
 Day 36 (after a long break): School started, things are busy af. I'll update on the weekends. Today's a saturday so I added two+ signs for one word logic. In ASL, there are often more than one sign for a word, much like english. My prior version didn't support this logic so I updated collect_words.py, detector.py and train_words.py
 
 Day 37: Monday. The dean of my school said he read this log. If you're reading this: selam hocam. Today I added 7 words ( I cant push them to git as my model is too large & the dataset is, too). I made collect_words.py pop up a confirmation when the user presses d to delete. The options are yes/no
+
+Day 38: It is the next tuesday. I got this message while I was adding words ning: SymbolDatabase.GetPrototype() is deprecated. Please use message_factory.GetMessageClass() instead. SymbolDatabase.GetPrototype() will be removed soon. Tomorrow I'll fix my code according to this.
