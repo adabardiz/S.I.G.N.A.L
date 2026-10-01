@@ -1,3 +1,7 @@
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 import cv2
 import numpy as np
 import mediapipe as mp
@@ -226,7 +230,7 @@ def main():
     start_time_ms = int(time.time() * 1000)
     last_timestamp_ms = 0
 
-    print(f"\n--- collecting word samples for '{word_to_record}' ---")
+    print(f"\ncollecting word samples for '{word_to_record}'")
     print("controls: 's' = record | 'd' = delete last sample | 'q' = quit\n")
 
     sample_idx = 0
@@ -274,15 +278,15 @@ def main():
                 draw_alpha_card(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_OVERLAY_BG, alpha=0.92, radius=16)
                 draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_PINK, thickness=2, radius=16)
 
-                msg = "Are you sure you want to delete this?"
+                msg = "are you sure you want to delete this?"
                 t_size = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
                 cv2.putText(frame, msg, (cx - t_size[0] // 2, cy - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLOR_WHITE, 2, cv2.LINE_AA)
 
                 yes_p1, yes_p2 = (cx - 150, cy + 15), (cx - 30, cy + 60)
                 no_p1, no_p2 = (cx + 30, cy + 15), (cx + 150, cy + 60)
 
-                draw_pill_button(frame, yes_p1, yes_p2, COLOR_CORAL, "YES [Y]")
-                draw_pill_button(frame, no_p1, no_p2, COLOR_GRAY, "NO [N]")
+                draw_pill_button(frame, yes_p1, yes_p2, COLOR_CORAL, "yes [Y]")
+                draw_pill_button(frame, no_p1, no_p2, COLOR_GRAY, "no [N]")
 
                 yes_clicked = False
                 no_clicked = False
