@@ -83,3 +83,5 @@ Day 37: Monday. The dean of my school said he read this log. If you're reading t
 Day 38: It is the next tuesday. I got this message while I was adding words ning: SymbolDatabase.GetPrototype() is deprecated. Please use message_factory.GetMessageClass() instead. SymbolDatabase.GetPrototype() will be removed soon. Tomorrow I'll fix my code according to this. Plus, I'll add the option to change the word in collect_words.py before the collecting process begins.
 
 Day 39: Consistency. Added 5 words today. Will do aforementioned things tomorrow. Testing showed great accuracy but it uses the 'very' logic for even non e words. Extremely laggy and showcases sign even in word mode. Will fix these. I'm thinking of big update days like sundays are big update days whereas the others are minor updates & sign updates.
+
+Day 40: I added 4 words -- we're officialy at 105 words in total! I fixed the deprecating thing in collect_words.py. Tomorrow I'll add the option to change the word in collect_words.py when the window opens.
