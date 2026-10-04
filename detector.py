@@ -1,3 +1,7 @@
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 import cv2
 import numpy as np
 import mediapipe as mp
@@ -228,25 +232,48 @@ class TextToSpeechEngine:
         self.voice_idx = (self.voice_idx + 1) % len(self.voices)
         self.current_voice_label = self.voices[self.voice_idx]
 
-class BackgroundAIThread:
+class BackgroundAIThread(threading.Thread):
     def __init__(self, letter_model=None):
+        super().__init__(daemon=True)
         self.letter_model = letter_model
         self.predicted_letter = "-"
-        self.result_lock = threading.Lock()
+        self.latest_features = None
+        self.has_new_data = False
+        self.lock = threading.Lock()
         self.running = True
 
     def update_data(self, features, hand_x=None):
-        if features is not None and self.letter_model is not None:
-            try:
-                pred = self.letter_model.predict([features])[0]
-                with self.result_lock:
-                    self.predicted_letter = str(pred).upper()
-            except Exception:
-                with self.result_lock:
-                    self.predicted_letter = "-"
-        else:
-            with self.result_lock:
-                self.predicted_letter = "-"
+        with self.lock:
+            self.latest_features = features
+            self.has_new_data = True
+
+    def run(self):
+        while self.running:
+            feats = None
+            has_data = False
+            with self.lock:
+                if self.has_new_data:
+                    feats = self.latest_features
+                    has_data = True
+                    self.has_new_data = False
+
+            if has_data:
+                if feats is not None and self.letter_model is not None:
+                    try:
+                        pred = self.letter_model.predict([feats])[0]
+                        with self.lock:
+                            self.predicted_letter = str(pred).upper()
+                    except Exception:
+                        with self.lock:
+                            self.predicted_letter = "-"
+                else:
+                    with self.lock:
+                        self.predicted_letter = "-"
+            time.sleep(0.01)
+
+    def get_prediction(self):
+        with self.lock:
+            return self.predicted_letter
 
 mouse_click_pos = None
 def on_mouse_click(event, x, y, flags, param):
@@ -274,6 +301,7 @@ def main():
         print("Loaded model.pkl")
 
     bg_ai = BackgroundAIThread(letter_model=letter_model)
+    bg_ai.start()
     tts = TextToSpeechEngine()
 
     base_options = python.BaseOptions(model_asset_path="hand_landmarker.task")
@@ -345,18 +373,26 @@ def main():
 
     start_time_ms = int(time.time() * 1000)
     last_timestamp_ms = 0
+    frame_counter = 0
+
+    cached_face_lms = None
+    cached_face_feats = [0.0] * (len(KEY_FACE_INDICES) * 3)
+    cached_pose_lms = None
+    cached_arm_feats = [0.0] * (len(KEY_ARM_INDICES) * 3)
+    cached_intensity_mult = 1.0
+    cached_intensity_label = "NEUTRAL"
 
     while True:
         ret, frame = cap.read()
         if not ret or frame is None:
             continue
-            
+
+        frame_counter += 1
         frame = cv2.flip(frame, 1)
         h, w, _ = frame.shape
         cx, cy = w // 2, h // 2
 
-        with bg_ai.result_lock:
-            predicted_letter = bg_ai.predicted_letter
+        predicted_letter = bg_ai.get_prediction()
 
         if mouse_click_pos is not None:
             mx, my = mouse_click_pos
@@ -499,13 +535,22 @@ def main():
         last_timestamp_ms = frame_timestamp_ms
 
         detection_result = detector.detect_for_video(mp_image, frame_timestamp_ms)
-        face_results = face_mesh.process(rgb_frame)
-        face_lms = face_results.multi_face_landmarks[0].landmark if face_results.multi_face_landmarks else None
-        face_feats = extract_face_features(face_lms)
 
-        pose_results = pose.process(rgb_frame)
-        pose_lms = pose_results.pose_landmarks.landmark if pose_results.pose_landmarks else None
-        arm_feats = extract_arm_features(pose_lms)
+        if frame_counter % 2 == 0:
+            face_results = face_mesh.process(rgb_frame)
+            cached_face_lms = face_results.multi_face_landmarks[0].landmark if face_results.multi_face_landmarks else None
+            cached_face_feats = extract_face_features(cached_face_lms)
+
+            pose_results = pose.process(rgb_frame)
+            cached_pose_lms = pose_results.pose_landmarks.landmark if pose_results.pose_landmarks else None
+            cached_arm_feats = extract_arm_features(cached_pose_lms)
+            cached_intensity_mult, cached_intensity_label = calculate_facial_intensity(cached_face_lms)
+
+        face_lms = cached_face_lms
+        face_feats = cached_face_feats
+        pose_lms = cached_pose_lms
+        arm_feats = cached_arm_feats
+        intensity_mult, intensity_label = cached_intensity_mult, cached_intensity_label
 
         if pose_lms:
             for start_idx, end_idx in ARM_CONNECTIONS:
@@ -519,8 +564,6 @@ def main():
                 lm = pose_lms[idx]
                 if lm.visibility > 0.5:
                     cv2.circle(frame, (int(lm.x * w), int(lm.y * h)), 6, COLOR_TERRACOTTA, -1, cv2.LINE_AA)
-        
-        intensity_mult, intensity_label = calculate_facial_intensity(face_lms)
 
         hand_detected = False
         space_gesture_detected = False
@@ -574,7 +617,7 @@ def main():
 
                 for hand_landmarks in valid_hands:
                     for connection in HAND_CONNECTIONS:
-                        start_p = (int(hand_landmarks[connection[0]].x * w), int(hand_landmarks[connection[1]].y * h))
+                        start_p = (int(hand_landmarks[connection[0]].x * w), int(hand_landmarks[connection[0]].y * h))
                         end_p = (int(hand_landmarks[connection[1]].x * w), int(hand_landmarks[connection[1]].y * h))
                         cv2.line(frame, start_p, end_p, (230, 235, 240), 2, cv2.LINE_AA)
                     for landmark in hand_landmarks:
