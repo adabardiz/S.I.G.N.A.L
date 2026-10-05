@@ -88,3 +88,4 @@ Day 40: I added 4 words -- we're officialy at 105 words in total! I fixed the de
 
 Day 41: Optimized detector.py for less lag will fix these tomorrow: cant detect hands well, sign displays even in word mode, very logic incorporated even into words, fixz color scheme according to color blind ones, fix controls for start presss start or s v_2 displayed even when not 
 
+Day 42: Fixed hand tracking & removed alphabet detection in word mode. Tomorrow I'm going to fix:
