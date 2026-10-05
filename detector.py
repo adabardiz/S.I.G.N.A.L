@@ -21,6 +21,9 @@ except ImportError:
             return [0.0] * 63
         wrist = landmarks[0]
         norm = landmarks - wrist
+        scale = np.linalg.norm(landmarks[9] - wrist)
+        if scale > 0:
+            norm = norm / scale
         return norm.flatten().tolist()
 
 COLOR_BG_CARD = (245, 245, 245)
@@ -137,10 +140,10 @@ def calculate_facial_intensity(face_landmarks):
     return round(intensity_multiplier, 2), level
 
 def is_valid_hand_shape(landmarks):
-    wrist = np.array([landmarks[0].x, landmarks[0].y])
-    middle_mcp = np.array([landmarks[9].x, landmarks[9].y])
+    wrist = np.array([landmarks[0].x, landmarks[0].y, landmarks[0].z])
+    middle_mcp = np.array([landmarks[9].x, landmarks[9].y, landmarks[9].z])
     palm_size = np.linalg.norm(wrist - middle_mcp)
-    return 0.02 < palm_size < 0.45
+    return 0.01 < palm_size < 0.65
 
 def is_open_hand(hand_landmarks):
     wrist = hand_landmarks[0]
@@ -309,9 +312,9 @@ def main():
         base_options=base_options, 
         running_mode=vision.RunningMode.VIDEO, 
         num_hands=2,
-        min_hand_detection_confidence=0.50,
-        min_hand_presence_confidence=0.50,
-        min_tracking_confidence=0.50
+        min_hand_detection_confidence=0.60,
+        min_hand_presence_confidence=0.60,
+        min_tracking_confidence=0.60
     )
     detector = vision.HandLandmarker.create_from_options(options)
 
@@ -381,6 +384,9 @@ def main():
     cached_arm_feats = [0.0] * (len(KEY_ARM_INDICES) * 3)
     cached_intensity_mult = 1.0
     cached_intensity_label = "NEUTRAL"
+
+    smoothed_landmarks = None
+    alpha = 0.70
 
     while True:
         ret, frame = cap.read()
@@ -611,8 +617,13 @@ def main():
                 else:
                     open_hand_start_time, open_hand_triggered = None, False
 
-                pts = np.array([[lm.x, lm.y, lm.z] for lm in primary_hand])
-                features = extract_hand_features(pts)
+                raw_pts = np.array([[lm.x, lm.y, lm.z] for lm in primary_hand])
+                if smoothed_landmarks is None:
+                    smoothed_landmarks = raw_pts
+                else:
+                    smoothed_landmarks = alpha * raw_pts + (1 - alpha) * smoothed_landmarks
+
+                features = extract_hand_features(smoothed_landmarks)
                 bg_ai.update_data(features, primary_hand[0].x)
 
                 for hand_landmarks in valid_hands:
@@ -623,9 +634,11 @@ def main():
                     for landmark in hand_landmarks:
                         cv2.circle(frame, (int(landmark.x * w), int(landmark.y * h)), 4, COLOR_TERRACOTTA, -1, cv2.LINE_AA)
             else:
+                smoothed_landmarks = None
                 bg_ai.update_data(None, None)
                 open_hand_start_time, space_start_time, letter_hold_start_time, current_holding_letter, prev_wrist_pos = None, None, None, None, None
         else:
+            smoothed_landmarks = None
             bg_ai.update_data(None, None)
             open_hand_start_time, space_start_time, letter_hold_start_time, current_holding_letter, prev_wrist_pos = None, None, None, None, None
 
@@ -715,10 +728,11 @@ def main():
             else:
                 cv2.putText(frame, line_text, (box_x1 + 14, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.40, COLOR_TEXT_MUTED, 1, cv2.LINE_AA)
 
-        draw_rounded_rect(frame, (20, 20), (220, 65), COLOR_BG_CARD, thickness=-1, radius=10)
-        draw_rounded_rect(frame, (20, 20), (220, 65), COLOR_BORDER, thickness=1, radius=10)
-        cv2.putText(frame, "CURRENT SIGN", (32, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.38, COLOR_TEXT_MUTED, 1, cv2.LINE_AA)
-        cv2.putText(frame, f"{predicted_letter}", (32, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.7, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
+        if current_mode == "SPELL":
+            draw_rounded_rect(frame, (20, 20), (220, 65), COLOR_BG_CARD, thickness=-1, radius=10)
+            draw_rounded_rect(frame, (20, 20), (220, 65), COLOR_BORDER, thickness=1, radius=10)
+            cv2.putText(frame, "CURRENT SIGN", (32, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.38, COLOR_TEXT_MUTED, 1, cv2.LINE_AA)
+            cv2.putText(frame, f"{predicted_letter}", (32, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.7, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
 
         draw_rounded_rect(frame, (230, 20), (430, 65), COLOR_BG_CARD, thickness=-1, radius=10)
         draw_rounded_rect(frame, (230, 20), (430, 65), COLOR_BORDER, thickness=1, radius=10)
