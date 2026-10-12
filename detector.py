@@ -628,7 +628,7 @@ def main():
 
                 for hand_landmarks in valid_hands:
                     for connection in HAND_CONNECTIONS:
-                        start_p = (int(hand_landmarks[connection[0]].x * w), int(hand_landmarks[connection[0]].y * h))
+                        start_p = (int(hand_landmarks[connection[0]].x * w), int(hand_landmarks[connection[1]].y * h))
                         end_p = (int(hand_landmarks[connection[1]].x * w), int(hand_landmarks[connection[1]].y * h))
                         cv2.line(frame, start_p, end_p, (230, 235, 240), 2, cv2.LINE_AA)
                     for landmark in hand_landmarks:
@@ -666,11 +666,13 @@ def main():
                                 word_str = str(predicted_word).strip()
                                 
                                 is_emotion_word = False
-                                if "(e)" in word_str.lower():
+                                if word_str.lower().endswith("_e") or "(e)" in word_str.lower():
                                     is_emotion_word = True
+                                    if word_str.lower().endswith("_e"):
+                                        word_str = word_str[:-2].strip()
                                     word_str = word_str.replace("(e)", "").replace("(E)", "").strip()
 
-                                if intensity_label == "EXTREME":
+                                if is_emotion_word and intensity_label == "EXTREME":
                                     word_str = f"VERY {word_str}"
 
                                 if "/" in word_str:
@@ -679,7 +681,7 @@ def main():
                                 else:
                                     current_word += f"{word_str} "
                                     word_tone = word_str.lower() if is_emotion_word else selected_tone
-                                    tts.speak(word_str, tone=word_tone, intensity=intensity_mult)
+                                    tts.speak(word_str, tone=word_tone, intensity=intensity_mult if is_emotion_word else 1.0)
                         except Exception as e:
                             print("Word prediction error:", e)
 
