@@ -91,3 +91,6 @@ Day 41: Optimized detector.py for less lag will fix these tomorrow: cant detect 
 Day 42: Fixed hand tracking & removed alphabet detection in word mode. Tomorrow I'm going to fix: Very logic incorporated into words, fix color scheme according to color blind adaptation, fix controls for start (add s option), make space detection better, switch out "stop" for "end", fix _v2 being displayed in multi sign words
 
 Day 43: My computer has crashed. It wont run any files, and it won't even save detector.py, I'll figure it out tomorrow.
+
+IMPORTANT! THINGS TO ADD: transcribe what the hearing person says so the hard of hearing person can understand em.
+THINGS TO FIX: cant detect hands well, sign displays even in word mode, very logic incorporated even into words, fix color scheme according to color blind ones, fix controls for start presss start or s v_2 displayed even when not 
