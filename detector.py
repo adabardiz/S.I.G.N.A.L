@@ -14,6 +14,12 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
 try:
+    import speech_recognition as sr
+    HAS_SR = True
+except ImportError:
+    HAS_SR = False
+
+try:
     from train_model import extract_hand_features
 except ImportError:
     def extract_hand_features(landmarks):
@@ -221,6 +227,25 @@ def draw_progress_bar(img, pt1, pt2, ratio, color=COLOR_TERRACOTTA):
     if fill_x2 > pt1[0] + 4:
         draw_rounded_rect(img, pt1, (fill_x2, pt2[1]), color, thickness=-1, radius=4)
 
+def draw_wrapped_text(img, text, pos, max_width, font, font_scale, color, thickness, line_spacing=32):
+    words = text.split(' ')
+    lines = []
+    current_line = ""
+    for word in words:
+        test_line = current_line + " " + word if current_line else word
+        t_size = cv2.getTextSize(test_line, font, font_scale, thickness)[0]
+        if t_size[0] <= max_width:
+            current_line = test_line
+        else:
+            lines.append(current_line)
+            current_line = word
+    if current_line:
+        lines.append(current_line)
+    
+    x, y = pos
+    for i, line in enumerate(lines[-5:]):
+        cv2.putText(img, line, (x, y + i * line_spacing), font, font_scale, color, thickness, cv2.LINE_AA)
+
 class TextToSpeechEngine:
     def __init__(self):
         self.voices = ["Default Neutral", "Expressive"]
@@ -278,6 +303,79 @@ class BackgroundAIThread(threading.Thread):
         with self.lock:
             return self.predicted_letter
 
+class SpeechToTextThread(threading.Thread):
+    def __init__(self):
+        super().__init__(daemon=True)
+        self.running = True
+        self.listening = False
+        self.transcript = ""
+        self.status = "IDLE"
+        self.lock = threading.Lock()
+        
+        if HAS_SR:
+            self.recognizer = sr.Recognizer()
+        else:
+            self.recognizer = None
+
+    def start_listening(self):
+        with self.lock:
+            self.listening = True
+            self.status = "LISTENING..."
+
+    def stop_listening(self):
+        with self.lock:
+            self.listening = False
+            self.status = "PAUSED"
+
+    def clear_transcript(self):
+        with self.lock:
+            self.transcript = ""
+
+    def get_data(self):
+        with self.lock:
+            return self.transcript, self.status, self.listening
+
+    def run(self):
+        if not HAS_SR:
+            with self.lock:
+                self.status = "Install 'speech_recognition' & 'pyaudio'"
+            while self.running:
+                time.sleep(0.5)
+            return
+
+        while self.running:
+            is_active = False
+            with self.lock:
+                is_active = self.listening
+
+            if is_active:
+                try:
+                    with sr.Microphone() as source:
+                        with self.lock:
+                            self.status = "LISTENING TO HEARING PERSON..."
+                        self.recognizer.adjust_for_ambient_noise(source, duration=0.3)
+                        audio = self.recognizer.listen(source, timeout=3, phrase_time_limit=6)
+                    
+                    with self.lock:
+                        self.status = "PROCESSING SPEECH..."
+                    text = self.recognizer.recognize_google(audio)
+                    
+                    with self.lock:
+                        if self.transcript:
+                            self.transcript += " " + text
+                        else:
+                            self.transcript = text
+                        self.status = "LISTENING TO HEARING PERSON..."
+                except sr.WaitTimeoutError:
+                    pass
+                except sr.UnknownValueError:
+                    pass
+                except Exception as e:
+                    with self.lock:
+                        self.status = f"MIC ACTIVE (Awaiting Speech)"
+            else:
+                time.sleep(0.1)
+
 mouse_click_pos = None
 def on_mouse_click(event, x, y, flags, param):
     global mouse_click_pos
@@ -305,6 +403,10 @@ def main():
 
     bg_ai = BackgroundAIThread(letter_model=letter_model)
     bg_ai.start()
+    
+    stt_thread = SpeechToTextThread()
+    stt_thread.start()
+    
     tts = TextToSpeechEngine()
 
     base_options = python.BaseOptions(model_asset_path="hand_landmarker.task")
@@ -339,6 +441,8 @@ def main():
     window_name = "ASL Gesture Translation System"
     cv2.namedWindow(window_name)
     cv2.setMouseCallback(window_name, on_mouse_click)
+
+    app_view = "SIGN" 
 
     current_mode = "SPELL"
     word_sequence_buffer = deque(maxlen=30)
@@ -404,43 +508,63 @@ def main():
             mx, my = mouse_click_pos
             mouse_click_pos = None
 
-            if (w - 550) <= mx <= (w - 420) and 20 <= my <= 55:
-                is_recording = not is_recording
-                if is_recording:
+            if (w - 710) <= mx <= (w - 560) and 20 <= my <= 55:
+                if app_view == "SIGN":
+                    app_view = "TRANSCRIPTION"
+                    stt_thread.start_listening()
+                else:
+                    app_view = "SIGN"
+                    stt_thread.stop_listening()
+
+            elif (w - 550) <= mx <= (w - 420) and 20 <= my <= 55:
+                if app_view == "SIGN":
+                    is_recording = not is_recording
+                    if is_recording:
+                        current_word = ""
+                        finished_word = ""
+                        selecting_punctuation = False
+                        punct_sub = None
+                        selecting_tense = False
+                        selecting_synonym = False
+                        word_sequence_buffer.clear()
+                        last_word_pred_time = 0.0
+                    else:
+                        if current_word.strip():
+                            selecting_punctuation = True
+                            punct_sub = None
+                        else:
+                            finished_word = ""
+                    open_hand_start_time = None
+                else:
+                    live_text, live_status, is_listening = stt_thread.get_data()
+                    if is_listening:
+                        stt_thread.stop_listening()
+                    else:
+                        stt_thread.start_listening()
+
+            elif (w - 410) <= mx <= (w - 280) and 20 <= my <= 55:
+                if app_view == "SIGN":
+                    current_mode = "WORD" if current_mode == "SPELL" else "SPELL"
+                    selecting_synonym = False
+                    word_sequence_buffer.clear()
+                    last_word_pred_time = 0.0
+
+            elif (w - 140) <= mx <= (w - 20) and 20 <= my <= 55:
+                if app_view == "SIGN":
                     current_word = ""
                     finished_word = ""
                     selecting_punctuation = False
                     punct_sub = None
                     selecting_tense = False
                     selecting_synonym = False
-                    word_sequence_buffer.clear()
-                    last_word_pred_time = 0.0
                 else:
-                    if current_word.strip():
-                        selecting_punctuation = True
-                        punct_sub = None
-                    else:
-                        finished_word = ""
-                open_hand_start_time = None
-
-            elif (w - 410) <= mx <= (w - 280) and 20 <= my <= 55:
-                current_mode = "WORD" if current_mode == "SPELL" else "SPELL"
-                selecting_synonym = False
-                word_sequence_buffer.clear()
-                last_word_pred_time = 0.0
-
-            elif (w - 140) <= mx <= (w - 20) and 20 <= my <= 55:
-                current_word = ""
-                finished_word = ""
-                selecting_punctuation = False
-                punct_sub = None
-                selecting_tense = False
-                selecting_synonym = False
+                    stt_thread.clear_transcript()
 
             elif (w - 270) <= mx <= (w - 150) and 20 <= my <= 55:
-                current_word = current_word[:-1]
+                if app_view == "SIGN":
+                    current_word = current_word[:-1]
 
-            elif selecting_synonym:
+            elif selecting_synonym and app_view == "SIGN":
                 btn_y1, btn_y2 = cy - 10, cy + 50
                 if (cx - 210) <= mx <= (cx - 10) and btn_y1 <= my <= btn_y2 and len(synonym_options) >= 1:
                     chosen = synonym_options[0]
@@ -455,7 +579,7 @@ def main():
                     selecting_synonym = False
                     synonym_options = []
 
-            elif selecting_punctuation:
+            elif selecting_punctuation and app_view == "SIGN":
                 btn_y1, btn_y2 = cy - 10, cy + 80
                 if punct_sub is None:
                     if (cx - 320) <= mx <= (cx - 120) and btn_y1 <= my <= btn_y2:
@@ -492,7 +616,7 @@ def main():
                         temp_sentence, selected_tone = current_word.strip() + "?", "sarcastic"
                         selecting_punctuation, punct_sub, selecting_tense = False, None, True
 
-            elif selecting_tense and not is_converting_tense:
+            elif selecting_tense and not is_converting_tense and app_view == "SIGN":
                 chosen_tense = None
                 if (cy - 10) <= my <= (cy + 35):
                     if (cx - 210) <= mx <= (cx - 10): chosen_tense = "NOW"
@@ -520,7 +644,7 @@ def main():
                         daemon=True
                     ).start()
 
-            elif not is_recording and finished_word:
+            elif not is_recording and finished_word and app_view == "SIGN":
                 btn_y1, btn_y2 = cy + 60, cy + 105
                 if (cx - 305) <= mx <= (cx - 115) and btn_y1 <= my <= btn_y2:
                     tts.speak(finished_word, selected_tone)
@@ -591,7 +715,7 @@ def main():
                 if not space_gesture_detected:
                     open_hand = is_open_hand(primary_hand)
 
-                if is_recording and space_gesture_detected:
+                if is_recording and space_gesture_detected and app_view == "SIGN":
                     if space_start_time is None: space_start_time = time.time()
                     elif (time.time() - space_start_time >= ACTION_GESTURE_DURATION) and not space_triggered:
                         current_word += " "
@@ -599,7 +723,7 @@ def main():
                 else:
                     space_start_time, space_triggered = None, False
 
-                if current_mode == "SPELL" and open_hand and not space_gesture_detected and hand_movement < 0.035:
+                if current_mode == "SPELL" and open_hand and not space_gesture_detected and hand_movement < 0.035 and app_view == "SIGN":
                     if open_hand_start_time is None: open_hand_start_time = time.time()
                     elif (time.time() - open_hand_start_time >= TOGGLE_GESTURE_DURATION) and not open_hand_triggered:
                         open_hand_triggered = True
@@ -628,7 +752,7 @@ def main():
 
                 for hand_landmarks in valid_hands:
                     for connection in HAND_CONNECTIONS:
-                        start_p = (int(hand_landmarks[connection[0]].x * w), int(hand_landmarks[connection[1]].y * h))
+                        start_p = (int(hand_landmarks[connection[0]].x * w), int(hand_landmarks[connection[0]].y * h))
                         end_p = (int(hand_landmarks[connection[1]].x * w), int(hand_landmarks[connection[1]].y * h))
                         cv2.line(frame, start_p, end_p, (230, 235, 240), 2, cv2.LINE_AA)
                     for landmark in hand_landmarks:
@@ -642,7 +766,7 @@ def main():
             bg_ai.update_data(None, None)
             open_hand_start_time, space_start_time, letter_hold_start_time, current_holding_letter, prev_wrist_pos = None, None, None, None, None
 
-        if is_recording and not open_hand and not space_gesture_detected and hand_detected and not selecting_synonym:
+        if is_recording and not open_hand and not space_gesture_detected and hand_detected and not selecting_synonym and app_view == "SIGN":
             if current_mode == "SPELL":
                 if predicted_letter == current_holding_letter:
                     if letter_hold_start_time and (time.time() - letter_hold_start_time >= HOLD_LETTER_DURATION):
@@ -692,183 +816,224 @@ def main():
         else:
             letter_hold_start_time, current_holding_letter = None, None
 
-        rec_bg = COLOR_SAGE if not is_recording else COLOR_ROSE
-        rec_txt_color = (255, 255, 255)
-        rec_btn_text = "STOP" if is_recording else "START"
-        draw_pill_button(frame, (w - 550, 20), (w - 420, 55), rec_bg, rec_btn_text, text_color=rec_txt_color, font_scale=0.55)
+        view_bg = COLOR_TERRACOTTA if app_view == "SIGN" else COLOR_SAGE
+        draw_pill_button(frame, (w - 710, 20), (w - 560, 55), view_bg, f"VIEW: {app_view}", text_color=(255, 255, 255), font_scale=0.45)
 
-        mode_bg = COLOR_TERRACOTTA if current_mode == "SPELL" else COLOR_SAND
-        mode_txt_color = (255, 255, 255) if current_mode == "SPELL" else COLOR_TEXT_DARK
-        draw_pill_button(frame, (w - 410, 20), (w - 280, 55), mode_bg, f"MODE: {current_mode}", text_color=mode_txt_color, font_scale=0.45)
+        if app_view == "SIGN":
+            rec_bg = COLOR_SAGE if not is_recording else COLOR_ROSE
+            rec_btn_text = "STOP" if is_recording else "START"
+            draw_pill_button(frame, (w - 550, 20), (w - 420, 55), rec_bg, rec_btn_text, text_color=(255, 255, 255), font_scale=0.55)
 
-        draw_pill_button(frame, (w - 270, 20), (w - 150, 55), COLOR_SAND, "DELETE", text_color=COLOR_TEXT_DARK, font_scale=0.55)
-        draw_pill_button(frame, (w - 140, 20), (w - 20, 55), COLOR_ROSE, "CLEAR", text_color=(255, 255, 255), font_scale=0.55)
+            mode_bg = COLOR_TERRACOTTA if current_mode == "SPELL" else COLOR_SAND
+            mode_txt_color = (255, 255, 255) if current_mode == "SPELL" else COLOR_TEXT_DARK
+            draw_pill_button(frame, (w - 410, 20), (w - 280, 55), mode_bg, f"MODE: {current_mode}", text_color=mode_txt_color, font_scale=0.45)
 
-        box_x1, box_y1 = w - 300, 75
-        box_x2, box_y2 = w - 20, 310
-        draw_rounded_rect(frame, (box_x1, box_y1), (box_x2, box_y2), COLOR_BG_CARD, thickness=-1, radius=12)
-        draw_rounded_rect(frame, (box_x1, box_y1), (box_x2, box_y2), COLOR_BORDER, thickness=1, radius=12)
+            draw_pill_button(frame, (w - 270, 20), (w - 150, 55), COLOR_SAND, "DELETE", text_color=COLOR_TEXT_DARK, font_scale=0.55)
+            draw_pill_button(frame, (w - 140, 20), (w - 20, 55), COLOR_ROSE, "CLEAR", text_color=(255, 255, 255), font_scale=0.55)
 
-        instructions = [
-            "CONTROLS",
-            "Start/Stop: Click START/STOP",
-            "Toggle Mode: Click MODE / 'm'",
-            "Start Word Mode: Press 's'",
-            "Palm Start: Hold open palm",
-            "Space: Hold 2 open palms",
-            "Delete: Click DELETE",
-            "Clear All: Click CLEAR",
-            "Type Letter: Hold sign 2s",
-            "Toggle Voice: Press 'v'",
-            "Quit App: Press 'q'"
-        ]
+            box_x1, box_y1 = w - 300, 75
+            box_x2, box_y2 = w - 20, 310
+            draw_rounded_rect(frame, (box_x1, box_y1), (box_x2, box_y2), COLOR_BG_CARD, thickness=-1, radius=12)
+            draw_rounded_rect(frame, (box_x1, box_y1), (box_x2, box_y2), COLOR_BORDER, thickness=1, radius=12)
 
-        for idx, line_text in enumerate(instructions):
-            y_pos = box_y1 + 22 + (idx * 20)
-            if idx == 0:
-                cv2.putText(frame, line_text, (box_x1 + 14, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
-            else:
-                cv2.putText(frame, line_text, (box_x1 + 14, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.40, COLOR_TEXT_MUTED, 1, cv2.LINE_AA)
+            instructions = [
+                "CONTROLS",
+                "Toggle View: Click VIEW / 't'",
+                "Start/Stop: Click START/STOP",
+                "Toggle Mode: Click MODE / 'm'",
+                "Start Word Mode: Press 's'",
+                "Palm Start: Hold open palm",
+                "Space: Hold 2 open palms",
+                "Delete: Click DELETE",
+                "Clear All: Click CLEAR",
+                "Type Letter: Hold sign 2s",
+                "Toggle Voice: Press 'v'",
+                "Quit App: Press 'q'"
+            ]
 
-        if current_mode == "SPELL":
-            draw_rounded_rect(frame, (20, 20), (220, 65), COLOR_BG_CARD, thickness=-1, radius=10)
-            draw_rounded_rect(frame, (20, 20), (220, 65), COLOR_BORDER, thickness=1, radius=10)
-            cv2.putText(frame, "CURRENT SIGN", (32, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.38, COLOR_TEXT_MUTED, 1, cv2.LINE_AA)
-            cv2.putText(frame, f"{predicted_letter}", (32, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.7, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
+            for idx, line_text in enumerate(instructions):
+                y_pos = box_y1 + 22 + (idx * 20)
+                if idx == 0:
+                    cv2.putText(frame, line_text, (box_x1 + 14, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
+                else:
+                    cv2.putText(frame, line_text, (box_x1 + 14, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.40, COLOR_TEXT_MUTED, 1, cv2.LINE_AA)
 
-        draw_rounded_rect(frame, (230, 20), (430, 65), COLOR_BG_CARD, thickness=-1, radius=10)
-        draw_rounded_rect(frame, (230, 20), (430, 65), COLOR_BORDER, thickness=1, radius=10)
-        cv2.putText(frame, "VOICE ENGINE", (242, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.38, COLOR_TEXT_MUTED, 1, cv2.LINE_AA)
-        cv2.putText(frame, f"{tts.current_voice_label}", (242, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TERRACOTTA, 2, cv2.LINE_AA)
+            if current_mode == "SPELL":
+                draw_rounded_rect(frame, (20, 20), (220, 65), COLOR_BG_CARD, thickness=-1, radius=10)
+                draw_rounded_rect(frame, (20, 20), (220, 65), COLOR_BORDER, thickness=1, radius=10)
+                cv2.putText(frame, "CURRENT SIGN", (32, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.38, COLOR_TEXT_MUTED, 1, cv2.LINE_AA)
+                cv2.putText(frame, f"{predicted_letter}", (32, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.7, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
 
-        draw_rounded_rect(frame, (440, 20), (640, 65), COLOR_BG_CARD, thickness=-1, radius=10)
-        draw_rounded_rect(frame, (440, 20), (640, 65), COLOR_BORDER, thickness=1, radius=10)
-        cv2.putText(frame, "EMOTION INTENSITY", (452, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.38, COLOR_TEXT_MUTED, 1, cv2.LINE_AA)
-        cv2.putText(frame, f"{intensity_label} ({intensity_mult}x)", (452, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.55, COLOR_SAGE if intensity_label == "NEUTRAL" else COLOR_TERRACOTTA, 2, cv2.LINE_AA)
+            draw_rounded_rect(frame, (230, 20), (430, 65), COLOR_BG_CARD, thickness=-1, radius=10)
+            draw_rounded_rect(frame, (230, 20), (430, 65), COLOR_BORDER, thickness=1, radius=10)
+            cv2.putText(frame, "VOICE ENGINE", (242, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.38, COLOR_TEXT_MUTED, 1, cv2.LINE_AA)
+            cv2.putText(frame, f"{tts.current_voice_label}", (242, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TERRACOTTA, 2, cv2.LINE_AA)
 
-        if is_recording:
-            draw_rounded_rect(frame, (20, 80), (430, 160), COLOR_BG_CARD, thickness=-1, radius=12)
-            draw_rounded_rect(frame, (20, 80), (430, 160), COLOR_BORDER, thickness=1, radius=12)
-            cv2.putText(frame, f"RECORDING ({current_mode})", (32, 102), cv2.FONT_HERSHEY_SIMPLEX, 0.42, COLOR_SAGE, 2, cv2.LINE_AA)
-            disp_word = f"{current_word}_" if current_word else "..."
-            cv2.putText(frame, disp_word, (32, 138), cv2.FONT_HERSHEY_SIMPLEX, 0.9, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
+            draw_rounded_rect(frame, (440, 20), (640, 65), COLOR_BG_CARD, thickness=-1, radius=10)
+            draw_rounded_rect(frame, (440, 20), (640, 65), COLOR_BORDER, thickness=1, radius=10)
+            cv2.putText(frame, "EMOTION INTENSITY", (452, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.38, COLOR_TEXT_MUTED, 1, cv2.LINE_AA)
+            cv2.putText(frame, f"{intensity_label} ({intensity_mult}x)", (452, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.55, COLOR_SAGE if intensity_label == "NEUTRAL" else COLOR_TERRACOTTA, 2, cv2.LINE_AA)
 
-        if is_recording and not open_hand and not space_gesture_detected and hand_detected and not selecting_synonym:
-            if current_mode == "SPELL" and current_holding_letter and current_holding_letter != "-" and letter_hold_start_time:
-                letter_elapsed = min(time.time() - letter_hold_start_time, HOLD_LETTER_DURATION)
-                l_ratio = letter_elapsed / HOLD_LETTER_DURATION
-                cv2.putText(frame, f"Holding '{current_holding_letter}'...", (20, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLOR_TEXT_DARK, 1, cv2.LINE_AA)
-                draw_progress_bar(frame, (20, 188), (220, 200), l_ratio, color=COLOR_TERRACOTTA)
+            if is_recording:
+                draw_rounded_rect(frame, (20, 80), (430, 160), COLOR_BG_CARD, thickness=-1, radius=12)
+                draw_rounded_rect(frame, (20, 80), (430, 160), COLOR_BORDER, thickness=1, radius=12)
+                cv2.putText(frame, f"RECORDING ({current_mode})", (32, 102), cv2.FONT_HERSHEY_SIMPLEX, 0.42, COLOR_SAGE, 2, cv2.LINE_AA)
+                disp_word = f"{current_word}_" if current_word else "..."
+                cv2.putText(frame, disp_word, (32, 138), cv2.FONT_HERSHEY_SIMPLEX, 0.9, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
 
-            elif current_mode == "WORD" and asl_word_model is not None:
-                buf_len = len(word_sequence_buffer)
-                w_ratio = buf_len / 30.0
-                cv2.putText(frame, f"Capturing gesture ({buf_len}/30)...", (20, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLOR_TEXT_DARK, 1, cv2.LINE_AA)
-                draw_progress_bar(frame, (20, 188), (220, 200), w_ratio, color=COLOR_SAGE)
+            if is_recording and not open_hand and not space_gesture_detected and hand_detected and not selecting_synonym:
+                if current_mode == "SPELL" and current_holding_letter and current_holding_letter != "-" and letter_hold_start_time:
+                    letter_elapsed = min(time.time() - letter_hold_start_time, HOLD_LETTER_DURATION)
+                    l_ratio = letter_elapsed / HOLD_LETTER_DURATION
+                    cv2.putText(frame, f"Holding '{current_holding_letter}'...", (20, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLOR_TEXT_DARK, 1, cv2.LINE_AA)
+                    draw_progress_bar(frame, (20, 188), (220, 200), l_ratio, color=COLOR_TERRACOTTA)
 
-        if selecting_synonym:
-            box_w, box_h = 520, 160
-            m_x1, m_y1 = cx - box_w // 2, cy - box_h // 2
-            m_x2, m_y2 = cx + box_w // 2, cy + box_h // 2
-            draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_OVERLAY_BG, thickness=-1, radius=16)
-            draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BORDER, thickness=1, radius=16)
+                elif current_mode == "WORD" and asl_word_model is not None:
+                    buf_len = len(word_sequence_buffer)
+                    w_ratio = buf_len / 30.0
+                    cv2.putText(frame, f"Capturing gesture ({buf_len}/30)...", (20, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLOR_TEXT_DARK, 1, cv2.LINE_AA)
+                    draw_progress_bar(frame, (20, 188), (220, 200), w_ratio, color=COLOR_SAGE)
 
-            title = "SELECT WORD INTENT"
-            t_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)[0]
-            cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
+            if selecting_synonym:
+                box_w, box_h = 520, 160
+                m_x1, m_y1 = cx - box_w // 2, cy - box_h // 2
+                m_x2, m_y2 = cx + box_w // 2, cy + box_h // 2
+                draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_OVERLAY_BG, thickness=-1, radius=16)
+                draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BORDER, thickness=1, radius=16)
 
-            btn_h = 45
-            if len(synonym_options) >= 1:
-                opt1 = synonym_options[0]
-                draw_pill_button(frame, (cx - 210, cy - 10), (cx - 10, cy - 10 + btn_h), COLOR_SAGE, opt1, text_color=(255, 255, 255), font_scale=0.6)
+                title = "SELECT WORD INTENT"
+                t_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)[0]
+                cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
 
-            if len(synonym_options) >= 2:
-                opt2 = synonym_options[1]
-                draw_pill_button(frame, (cx + 10, cy - 10), (cx + 210, cy - 10 + btn_h), COLOR_TERRACOTTA, opt2, text_color=(255, 255, 255), font_scale=0.6)
+                btn_h = 45
+                if len(synonym_options) >= 1:
+                    opt1 = synonym_options[0]
+                    draw_pill_button(frame, (cx - 210, cy - 10), (cx - 10, cy - 10 + btn_h), COLOR_SAGE, opt1, text_color=(255, 255, 255), font_scale=0.6)
 
-        if selecting_punctuation:
-            box_w, box_h = 700, 180
-            m_x1, m_y1 = cx - box_w // 2, cy - box_h // 2
-            m_x2, m_y2 = cx + box_w // 2, cy + box_h // 2
-            draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_OVERLAY_BG, thickness=-1, radius=16)
-            draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BORDER, thickness=1, radius=16)
+                if len(synonym_options) >= 2:
+                    opt2 = synonym_options[1]
+                    draw_pill_button(frame, (cx + 10, cy - 10), (cx + 210, cy - 10 + btn_h), COLOR_TERRACOTTA, opt2, text_color=(255, 255, 255), font_scale=0.6)
 
-            if punct_sub is None:
-                title = "SELECT PUNCTUATION"
+            if selecting_punctuation:
+                box_w, box_h = 700, 180
+                m_x1, m_y1 = cx - box_w // 2, cy - box_h // 2
+                m_x2, m_y2 = cx + box_w // 2, cy + box_h // 2
+                draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_OVERLAY_BG, thickness=-1, radius=16)
+                draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BORDER, thickness=1, radius=16)
+
+                if punct_sub is None:
+                    title = "SELECT PUNCTUATION"
+                    t_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)[0]
+                    cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
+
+                    draw_pill_button(frame, (cx - 320, cy - 10), (cx - 120, cy + 50), COLOR_SAND, ". (Period)", text_color=COLOR_TEXT_DARK, font_scale=0.55)
+                    draw_pill_button(frame, (cx - 100, cy - 10), (cx + 100, cy + 50), COLOR_SAGE, "! (Exclamation)", text_color=(255, 255, 255), font_scale=0.55)
+                    draw_pill_button(frame, (cx + 120, cy - 10), (cx + 320, cy + 50), COLOR_TERRACOTTA, "? (Question)", text_color=(255, 255, 255), font_scale=0.55)
+
+                elif punct_sub == "PERIOD":
+                    title = "PERIOD (.) INTENT & TONE"
+                    t_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)[0]
+                    cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
+
+                    draw_pill_button(frame, (cx - 300, cy - 10), (cx - 110, cy + 50), COLOR_SAND, "Neutral", text_color=COLOR_TEXT_DARK, font_scale=0.55)
+                    draw_pill_button(frame, (cx - 95, cy - 10), (cx + 95, cy + 50), COLOR_ROSE, "Sad", text_color=(255, 255, 255), font_scale=0.55)
+                    draw_pill_button(frame, (cx + 110, cy - 10), (cx + 300, cy + 50), COLOR_TERRACOTTA, "Sarcastic", text_color=(255, 255, 255), font_scale=0.55)
+
+                elif punct_sub == "EXCLAMATION":
+                    title = "EXCLAMATION (!) TONE"
+                    t_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)[0]
+                    cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
+
+                    draw_pill_button(frame, (cx - 200, cy - 10), (cx - 10, cy + 50), COLOR_SAGE, "Happy", text_color=(255, 255, 255), font_scale=0.55)
+                    draw_pill_button(frame, (cx + 10, cy - 10), (cx + 200, cy + 50), COLOR_TERRACOTTA, "Angry", text_color=(255, 255, 255), font_scale=0.55)
+
+                elif punct_sub == "QUESTION":
+                    title = "QUESTION (?) TONE"
+                    t_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)[0]
+                    cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
+
+                    draw_pill_button(frame, (cx - 200, cy - 10), (cx - 10, cy + 50), COLOR_SAND, "Surprised", text_color=COLOR_TEXT_DARK, font_scale=0.55)
+                    draw_pill_button(frame, (cx + 10, cy - 10), (cx + 200, cy + 50), COLOR_TERRACOTTA, "Sarcastic", text_color=(255, 255, 255), font_scale=0.55)
+
+            if selecting_tense:
+                box_w, box_h = 520, 180
+                m_x1, m_y1 = cx - box_w // 2, cy - box_h // 2
+                m_x2, m_y2 = cx + box_w // 2, cy + box_h // 2
+                draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_OVERLAY_BG, thickness=-1, radius=16)
+                draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BORDER, thickness=1, radius=16)
+
+                title = "TRANSFORM TENSE"
                 t_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)[0]
                 cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
 
-                draw_pill_button(frame, (cx - 320, cy - 10), (cx - 120, cy + 50), COLOR_SAND, ". (Period)", text_color=COLOR_TEXT_DARK, font_scale=0.55)
-                draw_pill_button(frame, (cx - 100, cy - 10), (cx + 100, cy + 50), COLOR_SAGE, "! (Exclamation)", text_color=(255, 255, 255), font_scale=0.55)
-                draw_pill_button(frame, (cx + 120, cy - 10), (cx + 320, cy + 50), COLOR_TERRACOTTA, "? (Question)", text_color=(255, 255, 255), font_scale=0.55)
+                draw_pill_button(frame, (cx - 210, cy - 10), (cx - 10, cy + 35), COLOR_SAGE, "PRESENT (NOW)", text_color=(255, 255, 255), font_scale=0.5)
+                draw_pill_button(frame, (cx + 10, cy - 10), (cx + 210, cy + 35), COLOR_TERRACOTTA, "PAST", text_color=(255, 255, 255), font_scale=0.5)
+                draw_pill_button(frame, (cx - 210, cy + 50), (cx - 10, cy + 95), COLOR_SAND, "FUTURE", text_color=COLOR_TEXT_DARK, font_scale=0.5)
+                draw_pill_button(frame, (cx + 10, cy + 50), (cx + 210, cy + 95), COLOR_ROSE, "ORIGINAL", text_color=(255, 255, 255), font_scale=0.5)
 
-            elif punct_sub == "PERIOD":
-                title = "PERIOD (.) INTENT & TONE"
-                t_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)[0]
-                cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
+            if not is_recording and finished_word and not selecting_punctuation and not selecting_tense:
+                box_w, box_h = 650, 120
+                m_x1, m_y1 = cx - box_w // 2, cy + 10
+                m_x2, m_y2 = cx + box_w // 2, cy + 130
+                draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BG_CARD, thickness=-1, radius=14)
+                draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BORDER, thickness=1, radius=14)
 
-                draw_pill_button(frame, (cx - 300, cy - 10), (cx - 110, cy + 50), COLOR_SAND, "Neutral", text_color=COLOR_TEXT_DARK, font_scale=0.55)
-                draw_pill_button(frame, (cx - 95, cy - 10), (cx + 95, cy + 50), COLOR_ROSE, "Sad", text_color=(255, 255, 255), font_scale=0.55)
-                draw_pill_button(frame, (cx + 110, cy - 10), (cx + 300, cy + 50), COLOR_TERRACOTTA, "Sarcastic", text_color=(255, 255, 255), font_scale=0.55)
+                cv2.putText(frame, f"TRANSLATION: \"{finished_word}\"", (m_x1 + 20, m_y1 + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
 
-            elif punct_sub == "EXCLAMATION":
-                title = "EXCLAMATION (!) TONE"
-                t_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)[0]
-                cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
+                draw_pill_button(frame, (cx - 305, cy + 60), (cx - 115, cy + 105), COLOR_SAGE, "SPEAK AGAIN", text_color=(255, 255, 255), font_scale=0.5)
+                draw_pill_button(frame, (cx - 95, cy + 60), (cx + 95, cy + 105), COLOR_TERRACOTTA, "CHANGE TONE", text_color=(255, 255, 255), font_scale=0.5)
+                draw_pill_button(frame, (cx + 115, cy + 60), (cx + 305, cy + 105), COLOR_ROSE, "DISMISS", text_color=(255, 255, 255), font_scale=0.5)
 
-                draw_pill_button(frame, (cx - 200, cy - 10), (cx - 10, cy + 50), COLOR_SAGE, "Happy", text_color=(255, 255, 255), font_scale=0.55)
-                draw_pill_button(frame, (cx + 10, cy - 10), (cx + 200, cy + 50), COLOR_TERRACOTTA, "Angry", text_color=(255, 255, 255), font_scale=0.55)
+        else:
+            live_text, live_status, is_listening = stt_thread.get_data()
 
-            elif punct_sub == "QUESTION":
-                title = "QUESTION (?) TONE"
-                t_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)[0]
-                cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
+            mic_bg = COLOR_ROSE if is_listening else COLOR_SAGE
+            mic_text = "PAUSE MIC" if is_listening else "START MIC"
+            draw_pill_button(frame, (w - 550, 20), (w - 420, 55), mic_bg, mic_text, text_color=(255, 255, 255), font_scale=0.50)
+            draw_pill_button(frame, (w - 140, 20), (w - 20, 55), COLOR_ROSE, "CLEAR", text_color=(255, 255, 255), font_scale=0.55)
 
-                draw_pill_button(frame, (cx - 200, cy - 10), (cx - 10, cy + 50), COLOR_SAND, "Surprised", text_color=COLOR_TEXT_DARK, font_scale=0.55)
-                draw_pill_button(frame, (cx + 10, cy - 10), (cx + 200, cy + 50), COLOR_TERRACOTTA, "Sarcastic", text_color=(255, 255, 255), font_scale=0.55)
+            card_w, card_h = 920, 380
+            c_x1, c_y1 = cx - card_w // 2, cy - card_h // 2 + 30
+            c_x2, c_y2 = cx + card_w // 2, cy + card_h // 2 + 30
 
-        if selecting_tense:
-            box_w, box_h = 520, 180
-            m_x1, m_y1 = cx - box_w // 2, cy - box_h // 2
-            m_x2, m_y2 = cx + box_w // 2, cy + box_h // 2
-            draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_OVERLAY_BG, thickness=-1, radius=16)
-            draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BORDER, thickness=1, radius=16)
+            draw_rounded_rect(frame, (c_x1, c_y1), (c_x2, c_y2), COLOR_OVERLAY_BG, thickness=-1, radius=18)
+            draw_rounded_rect(frame, (c_x1, c_y1), (c_x2, c_y2), COLOR_BORDER, thickness=2, radius=18)
 
-            title = "TRANSFORM TENSE"
-            t_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)[0]
-            cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
+            cv2.putText(frame, "LIVE TRANSCRIPTION FOR DEAF / HARD OF HEARING USER", (c_x1 + 25, c_y1 + 45), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.60, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
+            
+            status_color = COLOR_SAGE if is_listening else COLOR_TERRACOTTA
+            cv2.putText(frame, f"STATUS: {live_status}", (c_x1 + 25, c_y1 + 75), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, status_color, 2, cv2.LINE_AA)
 
-            draw_pill_button(frame, (cx - 210, cy - 10), (cx - 10, cy + 35), COLOR_SAGE, "PRESENT (NOW)", text_color=(255, 255, 255), font_scale=0.5)
-            draw_pill_button(frame, (cx + 10, cy - 10), (cx + 210, cy + 35), COLOR_TERRACOTTA, "PAST", text_color=(255, 255, 255), font_scale=0.5)
-            draw_pill_button(frame, (cx - 210, cy + 50), (cx - 10, cy + 95), COLOR_SAND, "FUTURE", text_color=COLOR_TEXT_DARK, font_scale=0.5)
-            draw_pill_button(frame, (cx + 10, cy + 50), (cx + 210, cy + 95), COLOR_ROSE, "ORIGINAL", text_color=(255, 255, 255), font_scale=0.5)
+            cv2.line(frame, (c_x1 + 25, c_y1 + 95), (c_x2 - 25, c_y1 + 95), COLOR_BORDER, 1, cv2.LINE_AA)
 
-        if not is_recording and finished_word and not selecting_punctuation and not selecting_tense:
-            box_w, box_h = 650, 120
-            m_x1, m_y1 = cx - box_w // 2, cy + 10
-            m_x2, m_y2 = cx + box_w // 2, cy + 130
-            draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BG_CARD, thickness=-1, radius=14)
-            draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BORDER, thickness=1, radius=14)
-
-            cv2.putText(frame, f"TRANSLATION: \"{finished_word}\"", (m_x1 + 20, m_y1 + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
-
-            draw_pill_button(frame, (cx - 305, cy + 60), (cx - 115, cy + 105), COLOR_SAGE, "SPEAK AGAIN", text_color=(255, 255, 255), font_scale=0.5)
-            draw_pill_button(frame, (cx - 95, cy + 60), (cx + 95, cy + 105), COLOR_TERRACOTTA, "CHANGE TONE", text_color=(255, 255, 255), font_scale=0.5)
-            draw_pill_button(frame, (cx + 115, cy + 60), (cx + 305, cy + 105), COLOR_ROSE, "DISMISS", text_color=(255, 255, 255), font_scale=0.5)
+            disp_transcript = live_text if live_text else "Waiting for hearing person to speak..."
+            txt_color = COLOR_TEXT_DARK if live_text else COLOR_TEXT_MUTED
+            draw_wrapped_text(frame, disp_transcript, (c_x1 + 25, c_y1 + 135), card_w - 50, 
+                              cv2.FONT_HERSHEY_SIMPLEX, 0.75, txt_color, 2, line_spacing=38)
 
         cv2.imshow(window_name, frame)
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
             bg_ai.running = False
+            stt_thread.running = False
             break
-        elif key == ord('v'):
+        elif key == ord('t'):
+            if app_view == "SIGN":
+                app_view = "TRANSCRIPTION"
+                stt_thread.start_listening()
+            else:
+                app_view = "SIGN"
+                stt_thread.stop_listening()
+        elif key == ord('v') and app_view == "SIGN":
             tts.toggle_voice()
-        elif key == ord('m'):
+        elif key == ord('m') and app_view == "SIGN":
             current_mode = "WORD" if current_mode == "SPELL" else "SPELL"
             word_sequence_buffer.clear()
             last_word_pred_time = 0.0
-        elif key == ord('s'):
+        elif key == ord('s') and app_view == "SIGN":
             current_mode = "WORD"
             is_recording = True
             current_word = ""
