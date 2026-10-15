@@ -92,5 +92,6 @@ Day 42: Fixed hand tracking & removed alphabet detection in word mode. Tomorrow 
 
 Day 43: My computer has crashed. It wont run any files, and it won't even save detector.py, I'll figure it out tomorrow.
 
-IMPORTANT! THINGS TO ADD: transcribe what the hearing person says so the hard of hearing person can understand em.
+Day 44: I have, in fact, figured it out. Today I added live transcription. The algorithm can now switch between transcription and signing. I did this to fully ensure that both communities, hearing and hard-of-hearing/deaf, have a way to communicate with eachother.
+IMPORTANT! 
 THINGS TO FIX: cant detect hands well, sign displays even in word mode, very logic incorporated even into words, fix color scheme according to color blind ones, fix controls for start presss start or s v_2 displayed even when not 
