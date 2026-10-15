@@ -180,33 +180,12 @@ def transform_tense(sentence, tense_target):
         return f"Will {clean_sent.lower()}"
     return clean_sent
 
-def draw_rounded_rect(img, pt1, pt2, color, thickness=-1, radius=10):
-    x1, y1 = pt1
-    x2, y2 = pt2
-    w = x2 - x1
-    h = y2 - y1
-    r = min(radius, abs(w) // 2, abs(h) // 2)
+def draw_rect(img, pt1, pt2, color, thickness=-1):
+    cv2.rectangle(img, pt1, pt2, color, thickness)
 
-    if thickness < 0:
-        cv2.rectangle(img, (x1 + r, y1), (x2 - r, y2), color, -1)
-        cv2.rectangle(img, (x1, y1 + r), (x2, y2 - r), color, -1)
-        cv2.circle(img, (x1 + r, y1 + r), r, color, -1)
-        cv2.circle(img, (x2 - r, y1 + r), r, color, -1)
-        cv2.circle(img, (x1 + r, y2 - r), r, color, -1)
-        cv2.circle(img, (x2 - r, y2 - r), r, color, -1)
-    else:
-        cv2.line(img, (x1 + r, y1), (x2 - r, y1), color, thickness, cv2.LINE_AA)
-        cv2.line(img, (x1 + r, y2), (x2 - r, y2), color, thickness, cv2.LINE_AA)
-        cv2.line(img, (x1, y1 + r), (x1, y2 - r), color, thickness, cv2.LINE_AA)
-        cv2.line(img, (x2, y1 + r), (x2, y2 - r), color, thickness, cv2.LINE_AA)
-        cv2.ellipse(img, (x1 + r, y1 + r), (r, r), 180, 0, 90, color, thickness, cv2.LINE_AA)
-        cv2.ellipse(img, (x2 - r, y1 + r), (r, r), 270, 0, 90, color, thickness, cv2.LINE_AA)
-        cv2.ellipse(img, (x1 + r, y2 - r), (r, r), 90, 0, 90, color, thickness, cv2.LINE_AA)
-        cv2.ellipse(img, (x2 - r, y2 - r), (r, r), 0, 0, 90, color, thickness, cv2.LINE_AA)
-
-def draw_pill_button(img, pt1, pt2, bg_color, text, text_color=(40, 40, 40), font_scale=0.5):
-    draw_rounded_rect(img, pt1, pt2, bg_color, thickness=-1, radius=12)
-    draw_rounded_rect(img, pt1, pt2, COLOR_BORDER, thickness=1, radius=12)
+def draw_button(img, pt1, pt2, bg_color, text, text_color=(40, 40, 40), font_scale=0.5):
+    draw_rect(img, pt1, pt2, bg_color, thickness=-1)
+    draw_rect(img, pt1, pt2, COLOR_BORDER, thickness=1)
     t_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 2)[0]
     cx = (pt1[0] + pt2[0]) // 2
     cy = (pt1[1] + pt2[1]) // 2
@@ -214,11 +193,11 @@ def draw_pill_button(img, pt1, pt2, bg_color, text, text_color=(40, 40, 40), fon
                 cv2.FONT_HERSHEY_SIMPLEX, font_scale, text_color, 2, cv2.LINE_AA)
 
 def draw_progress_bar(img, pt1, pt2, ratio, color=COLOR_PURPLE):
-    draw_rounded_rect(img, pt1, pt2, (220, 220, 220), thickness=-1, radius=4)
+    draw_rect(img, pt1, pt2, (220, 220, 220), thickness=-1)
     w = pt2[0] - pt1[0]
     fill_x2 = pt1[0] + int(w * min(max(ratio, 0.0), 1.0))
-    if fill_x2 > pt1[0] + 4:
-        draw_rounded_rect(img, pt1, (fill_x2, pt2[1]), color, thickness=-1, radius=4)
+    if fill_x2 > pt1[0] + 2:
+        draw_rect(img, pt1, (fill_x2, pt2[1]), color, thickness=-1)
 
 def draw_wrapped_text(img, text, pos, max_width, font, font_scale, color, thickness, line_spacing=32):
     words = text.split(' ')
@@ -845,34 +824,34 @@ def main():
             letter_hold_start_time, current_holding_letter = None, None
 
         view_bg = COLOR_PURPLE if app_view == "SIGN" else COLOR_SAGE
-        draw_pill_button(frame, (w - 710, 20), (w - 560, 55), view_bg, f"MODE: {app_view}", text_color=(255, 255, 255), font_scale=0.45)
+        draw_button(frame, (w - 710, 20), (w - 560, 55), view_bg, f"MODE: {app_view}", text_color=(255, 255, 255), font_scale=0.45)
 
         if app_view == "SIGN":
             rec_bg = COLOR_SAGE if not is_recording else COLOR_ROSE
             rec_btn_text = "STOP" if is_recording else "START REC"
-            draw_pill_button(frame, (w - 550, 20), (w - 420, 55), rec_bg, rec_btn_text, text_color=(255, 255, 255), font_scale=0.50)
+            draw_button(frame, (w - 550, 20), (w - 420, 55), rec_bg, rec_btn_text, text_color=(255, 255, 255), font_scale=0.50)
 
             mode_bg = COLOR_PURPLE if current_mode == "SPELL" else COLOR_SAND
             mode_txt_color = (255, 255, 255) if current_mode == "SPELL" else COLOR_TEXT_DARK
-            draw_pill_button(frame, (w - 410, 20), (w - 280, 55), mode_bg, f"SIGN: {current_mode}", text_color=mode_txt_color, font_scale=0.45)
+            draw_button(frame, (w - 410, 20), (w - 280, 55), mode_bg, f"SIGN: {current_mode}", text_color=mode_txt_color, font_scale=0.45)
 
-            draw_pill_button(frame, (w - 270, 20), (w - 150, 55), COLOR_BLUE, "DELETE", text_color=(255, 255, 255), font_scale=0.55)
-            draw_pill_button(frame, (w - 140, 20), (w - 20, 55), COLOR_PINK, "CLEAR", text_color=(255, 255, 255), font_scale=0.55)
+            draw_button(frame, (w - 270, 20), (w - 150, 55), COLOR_BLUE, "DELETE", text_color=(255, 255, 255), font_scale=0.55)
+            draw_button(frame, (w - 140, 20), (w - 20, 55), COLOR_PINK, "CLEAR", text_color=(255, 255, 255), font_scale=0.55)
 
             if current_mode == "SPELL":
-                draw_rounded_rect(frame, (20, 20), (200, 65), COLOR_BG_CARD, thickness=-1, radius=10)
-                draw_rounded_rect(frame, (20, 20), (200, 65), COLOR_BORDER, thickness=1, radius=10)
+                draw_rect(frame, (20, 20), (200, 65), COLOR_BG_CARD, thickness=-1)
+                draw_rect(frame, (20, 20), (200, 65), COLOR_BORDER, thickness=1)
                 cv2.putText(frame, "CURRENT SIGN", (32, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.38, COLOR_TEXT_MUTED, 1, cv2.LINE_AA)
                 cv2.putText(frame, f"{predicted_letter}", (32, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.7, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
 
-            draw_rounded_rect(frame, (215, 20), (415, 65), COLOR_BG_CARD, thickness=-1, radius=10)
-            draw_rounded_rect(frame, (215, 20), (415, 65), COLOR_BORDER, thickness=1, radius=10)
+            draw_rect(frame, (215, 20), (415, 65), COLOR_BG_CARD, thickness=-1)
+            draw_rect(frame, (215, 20), (415, 65), COLOR_BORDER, thickness=1)
             cv2.putText(frame, "EMOTION INTENSITY", (227, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.38, COLOR_TEXT_MUTED, 1, cv2.LINE_AA)
             cv2.putText(frame, f"{intensity_label} ({intensity_mult}x)", (227, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.52, COLOR_SAGE if intensity_label == "NEUTRAL" else COLOR_PURPLE, 2, cv2.LINE_AA)
 
             if is_recording:
-                draw_rounded_rect(frame, (20, 80), (430, 160), COLOR_BG_CARD, thickness=-1, radius=12)
-                draw_rounded_rect(frame, (20, 80), (430, 160), COLOR_BORDER, thickness=1, radius=12)
+                draw_rect(frame, (20, 80), (430, 160), COLOR_BG_CARD, thickness=-1)
+                draw_rect(frame, (20, 80), (430, 160), COLOR_BORDER, thickness=1)
                 cv2.putText(frame, f"RECORDING ({current_mode})", (32, 102), cv2.FONT_HERSHEY_SIMPLEX, 0.42, COLOR_SAGE, 2, cv2.LINE_AA)
                 disp_word = f"{current_word}_" if current_word else "..."
                 cv2.putText(frame, disp_word, (32, 138), cv2.FONT_HERSHEY_SIMPLEX, 0.9, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
@@ -890,15 +869,15 @@ def main():
                     cv2.putText(frame, f"Holding (Sign/Word detecting)...", (20, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLOR_TEXT_DARK, 1, cv2.LINE_AA)
                     draw_progress_bar(frame, (20, 188), (220, 200), w_ratio, color=COLOR_SAGE)
 
-            draw_pill_button(frame, (20, h - 95), (230, h - 60), COLOR_BG_CARD, "Change Voice Engine (popup)", text_color=COLOR_TEXT_DARK, font_scale=0.40)
-            draw_pill_button(frame, (20, h - 50), (230, h - 15), COLOR_BG_CARD, "Controls (popup menu)", text_color=COLOR_TEXT_DARK, font_scale=0.40)
+            draw_button(frame, (20, h - 95), (230, h - 60), COLOR_BG_CARD, "Change Voice Engine (popup)", text_color=COLOR_TEXT_DARK, font_scale=0.40)
+            draw_button(frame, (20, h - 50), (230, h - 15), COLOR_BG_CARD, "Controls (popup menu)", text_color=COLOR_TEXT_DARK, font_scale=0.40)
 
             if selecting_synonym:
                 box_w, box_h = 520, 160
                 m_x1, m_y1 = cx - box_w // 2, cy - box_h // 2
                 m_x2, m_y2 = cx + box_w // 2, cy + box_h // 2
-                draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_OVERLAY_BG, thickness=-1, radius=16)
-                draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BORDER, thickness=1, radius=16)
+                draw_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_OVERLAY_BG, thickness=-1)
+                draw_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BORDER, thickness=1)
 
                 title = "SELECT WORD INTENT"
                 t_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)[0]
@@ -907,104 +886,104 @@ def main():
                 btn_h = 45
                 if len(synonym_options) >= 1:
                     opt1 = synonym_options[0]
-                    draw_pill_button(frame, (cx - 210, cy - 10), (cx - 10, cy - 10 + btn_h), COLOR_SAGE, opt1, text_color=(255, 255, 255), font_scale=0.6)
+                    draw_button(frame, (cx - 210, cy - 10), (cx - 10, cy - 10 + btn_h), COLOR_SAGE, opt1, text_color=(255, 255, 255), font_scale=0.6)
 
                 if len(synonym_options) >= 2:
                     opt2 = synonym_options[1]
-                    draw_pill_button(frame, (cx + 10, cy - 10), (cx + 210, cy - 10 + btn_h), COLOR_PURPLE, opt2, text_color=(255, 255, 255), font_scale=0.6)
+                    draw_button(frame, (cx + 10, cy - 10), (cx + 210, cy - 10 + btn_h), COLOR_PURPLE, opt2, text_color=(255, 255, 255), font_scale=0.6)
 
             if selecting_punctuation:
                 box_w, box_h = 700, 180
                 m_x1, m_y1 = cx - box_w // 2, cy - box_h // 2
                 m_x2, m_y2 = cx + box_w // 2, cy + box_h // 2
-                draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_OVERLAY_BG, thickness=-1, radius=16)
-                draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BORDER, thickness=1, radius=16)
+                draw_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_OVERLAY_BG, thickness=-1)
+                draw_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BORDER, thickness=1)
 
                 if punct_sub is None:
                     title = "SELECT PUNCTUATION"
                     t_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)[0]
                     cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
 
-                    draw_pill_button(frame, (cx - 320, cy - 10), (cx - 120, cy + 50), COLOR_SAND, ". (Period)", text_color=COLOR_TEXT_DARK, font_scale=0.55)
-                    draw_pill_button(frame, (cx - 100, cy - 10), (cx + 100, cy + 50), COLOR_SAGE, "! (Exclamation)", text_color=(255, 255, 255), font_scale=0.55)
-                    draw_pill_button(frame, (cx + 120, cy - 10), (cx + 320, cy + 50), COLOR_PURPLE, "? (Question)", text_color=(255, 255, 255), font_scale=0.55)
+                    draw_button(frame, (cx - 320, cy - 10), (cx - 120, cy + 50), COLOR_SAND, ". (Period)", text_color=COLOR_TEXT_DARK, font_scale=0.55)
+                    draw_button(frame, (cx - 100, cy - 10), (cx + 100, cy + 50), COLOR_SAGE, "! (Exclamation)", text_color=(255, 255, 255), font_scale=0.55)
+                    draw_button(frame, (cx + 120, cy - 10), (cx + 320, cy + 50), COLOR_PURPLE, "? (Question)", text_color=(255, 255, 255), font_scale=0.55)
 
                 elif punct_sub == "PERIOD":
                     title = "PERIOD (.) INTENT & TONE"
                     t_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)[0]
                     cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
 
-                    draw_pill_button(frame, (cx - 300, cy - 10), (cx - 110, cy + 50), COLOR_SAND, "Neutral", text_color=COLOR_TEXT_DARK, font_scale=0.55)
-                    draw_pill_button(frame, (cx - 95, cy - 10), (cx + 95, cy + 50), COLOR_ROSE, "Sad", text_color=(255, 255, 255), font_scale=0.55)
-                    draw_pill_button(frame, (cx + 110, cy - 10), (cx + 300, cy + 50), COLOR_PURPLE, "Sarcastic", text_color=(255, 255, 255), font_scale=0.55)
+                    draw_button(frame, (cx - 300, cy - 10), (cx - 110, cy + 50), COLOR_SAND, "Neutral", text_color=COLOR_TEXT_DARK, font_scale=0.55)
+                    draw_button(frame, (cx - 95, cy - 10), (cx + 95, cy + 50), COLOR_ROSE, "Sad", text_color=(255, 255, 255), font_scale=0.55)
+                    draw_button(frame, (cx + 110, cy - 10), (cx + 300, cy + 50), COLOR_PURPLE, "Sarcastic", text_color=(255, 255, 255), font_scale=0.55)
 
                 elif punct_sub == "EXCLAMATION":
                     title = "EXCLAMATION (!) TONE"
                     t_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)[0]
                     cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
 
-                    draw_pill_button(frame, (cx - 200, cy - 10), (cx - 10, cy + 50), COLOR_SAGE, "Happy", text_color=(255, 255, 255), font_scale=0.55)
-                    draw_pill_button(frame, (cx + 10, cy - 10), (cx + 200, cy + 50), COLOR_PURPLE, "Angry", text_color=(255, 255, 255), font_scale=0.55)
+                    draw_button(frame, (cx - 200, cy - 10), (cx - 10, cy + 50), COLOR_SAGE, "Happy", text_color=(255, 255, 255), font_scale=0.55)
+                    draw_button(frame, (cx + 10, cy - 10), (cx + 200, cy + 50), COLOR_PURPLE, "Angry", text_color=(255, 255, 255), font_scale=0.55)
 
                 elif punct_sub == "QUESTION":
                     title = "QUESTION (?) TONE"
                     t_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)[0]
                     cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
 
-                    draw_pill_button(frame, (cx - 200, cy - 10), (cx - 10, cy + 50), COLOR_SAND, "Surprised", text_color=COLOR_TEXT_DARK, font_scale=0.55)
-                    draw_pill_button(frame, (cx + 10, cy - 10), (cx + 200, cy + 50), COLOR_PURPLE, "Sarcastic", text_color=(255, 255, 255), font_scale=0.55)
+                    draw_button(frame, (cx - 200, cy - 10), (cx - 10, cy + 50), COLOR_SAND, "Surprised", text_color=COLOR_TEXT_DARK, font_scale=0.55)
+                    draw_button(frame, (cx + 10, cy - 10), (cx + 200, cy + 50), COLOR_PURPLE, "Sarcastic", text_color=(255, 255, 255), font_scale=0.55)
 
             if selecting_tense:
                 box_w, box_h = 520, 180
                 m_x1, m_y1 = cx - box_w // 2, cy - box_h // 2
                 m_x2, m_y2 = cx + box_w // 2, cy + box_h // 2
-                draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_OVERLAY_BG, thickness=-1, radius=16)
-                draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BORDER, thickness=1, radius=16)
+                draw_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_OVERLAY_BG, thickness=-1)
+                draw_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BORDER, thickness=1)
 
                 title = "TRANSFORM TENSE"
                 t_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)[0]
                 cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
 
-                draw_pill_button(frame, (cx - 210, cy - 10), (cx - 10, cy + 35), COLOR_SAGE, "PRESENT (NOW)", text_color=(255, 255, 255), font_scale=0.5)
-                draw_pill_button(frame, (cx + 10, cy - 10), (cx + 210, cy + 35), COLOR_PURPLE, "PAST", text_color=(255, 255, 255), font_scale=0.5)
-                draw_pill_button(frame, (cx - 210, cy + 50), (cx - 10, cy + 95), COLOR_SAND, "FUTURE", text_color=COLOR_TEXT_DARK, font_scale=0.5)
-                draw_pill_button(frame, (cx + 10, cy + 50), (cx + 210, cy + 95), COLOR_ROSE, "ORIGINAL", text_color=(255, 255, 255), font_scale=0.5)
+                draw_button(frame, (cx - 210, cy - 10), (cx - 10, cy + 35), COLOR_SAGE, "PRESENT (NOW)", text_color=(255, 255, 255), font_scale=0.5)
+                draw_button(frame, (cx + 10, cy - 10), (cx + 210, cy + 35), COLOR_PURPLE, "PAST", text_color=(255, 255, 255), font_scale=0.5)
+                draw_button(frame, (cx - 210, cy + 50), (cx - 10, cy + 95), COLOR_SAND, "FUTURE", text_color=COLOR_TEXT_DARK, font_scale=0.5)
+                draw_button(frame, (cx + 10, cy + 50), (cx + 210, cy + 95), COLOR_ROSE, "ORIGINAL", text_color=(255, 255, 255), font_scale=0.5)
 
             if not is_recording and finished_word and not selecting_punctuation and not selecting_tense:
                 box_w, box_h = 650, 120
                 m_x1, m_y1 = cx - box_w // 2, cy + 10
                 m_x2, m_y2 = cx + box_w // 2, cy + 130
-                draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BG_CARD, thickness=-1, radius=14)
-                draw_rounded_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BORDER, thickness=1, radius=14)
+                draw_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BG_CARD, thickness=-1)
+                draw_rect(frame, (m_x1, m_y1), (m_x2, m_y2), COLOR_BORDER, thickness=1)
 
                 cv2.putText(frame, f"TRANSLATION: \"{finished_word}\"", (m_x1 + 20, m_y1 + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
 
-                draw_pill_button(frame, (cx - 305, cy + 60), (cx - 115, cy + 105), COLOR_SAGE, "SPEAK AGAIN", text_color=(255, 255, 255), font_scale=0.5)
-                draw_pill_button(frame, (cx - 95, cy + 60), (cx + 95, cy + 105), COLOR_PURPLE, "CHANGE TONE", text_color=(255, 255, 255), font_scale=0.5)
-                draw_pill_button(frame, (cx + 115, cy + 60), (cx + 305, cy + 105), COLOR_ROSE, "DISMISS", text_color=(255, 255, 255), font_scale=0.5)
+                draw_button(frame, (cx - 305, cy + 60), (cx - 115, cy + 105), COLOR_SAGE, "SPEAK AGAIN", text_color=(255, 255, 255), font_scale=0.5)
+                draw_button(frame, (cx - 95, cy + 60), (cx + 95, cy + 105), COLOR_PURPLE, "CHANGE TONE", text_color=(255, 255, 255), font_scale=0.5)
+                draw_button(frame, (cx + 115, cy + 60), (cx + 305, cy + 105), COLOR_ROSE, "DISMISS", text_color=(255, 255, 255), font_scale=0.5)
 
         else:
             live_text, live_status, is_listening = stt_thread.get_data()
 
             mic_bg = COLOR_ROSE if is_listening else COLOR_SAGE
             mic_text = "PAUSE MIC" if is_listening else "START MIC"
-            draw_pill_button(frame, (w - 550, 20), (w - 420, 55), mic_bg, mic_text, text_color=(255, 255, 255), font_scale=0.50)
+            draw_button(frame, (w - 550, 20), (w - 420, 55), mic_bg, mic_text, text_color=(255, 255, 255), font_scale=0.50)
             
-            draw_pill_button(frame, (w - 410, 20), (w - 280, 55), COLOR_BLUE, "DEL WORD", text_color=(255, 255, 255), font_scale=0.50)
+            draw_button(frame, (w - 410, 20), (w - 280, 55), COLOR_BLUE, "DEL WORD", text_color=(255, 255, 255), font_scale=0.50)
 
             kbd_bg = COLOR_SAGE if keyboard_editing_active else COLOR_SAND
             kbd_txt_col = (255, 255, 255) if keyboard_editing_active else COLOR_TEXT_DARK
             kbd_label = "EDITING..." if keyboard_editing_active else "KEYBOARD"
-            draw_pill_button(frame, (w - 270, 20), (w - 150, 55), kbd_bg, kbd_label, text_color=kbd_txt_col, font_scale=0.45)
+            draw_button(frame, (w - 270, 20), (w - 150, 55), kbd_bg, kbd_label, text_color=kbd_txt_col, font_scale=0.45)
 
-            draw_pill_button(frame, (w - 140, 20), (w - 20, 55), COLOR_PINK, "CLEAR", text_color=(255, 255, 255), font_scale=0.55)
+            draw_button(frame, (w - 140, 20), (w - 20, 55), COLOR_PINK, "CLEAR", text_color=(255, 255, 255), font_scale=0.55)
 
             card_w, card_h = 920, 380
             c_x1, c_y1 = cx - card_w // 2, cy - card_h // 2 + 30
             c_x2, c_y2 = cx + card_w // 2, cy + card_h // 2 + 30
 
-            draw_rounded_rect(frame, (c_x1, c_y1), (c_x2, c_y2), COLOR_OVERLAY_BG, thickness=-1, radius=18)
-            draw_rounded_rect(frame, (c_x1, c_y1), (c_x2, c_y2), COLOR_BORDER, thickness=2, radius=18)
+            draw_rect(frame, (c_x1, c_y1), (c_x2, c_y2), COLOR_OVERLAY_BG, thickness=-1)
+            draw_rect(frame, (c_x1, c_y1), (c_x2, c_y2), COLOR_BORDER, thickness=2)
 
             cv2.putText(frame, "LIVE TRANSCRIPTION FOR DEAF / HARD OF HEARING USER", (c_x1 + 25, c_y1 + 45), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.60, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
@@ -1031,8 +1010,8 @@ def main():
             c_x1, c_y1 = cx - c_box_w // 2, cy - c_box_h // 2
             c_x2, c_y2 = cx + c_box_w // 2, cy + c_box_h // 2
 
-            draw_rounded_rect(frame, (c_x1, c_y1), (c_x2, c_y2), COLOR_OVERLAY_BG, thickness=-1, radius=16)
-            draw_rounded_rect(frame, (c_x1, c_y1), (c_x2, c_y2), COLOR_BORDER, thickness=2, radius=16)
+            draw_rect(frame, (c_x1, c_y1), (c_x2, c_y2), COLOR_OVERLAY_BG, thickness=-1)
+            draw_rect(frame, (c_x1, c_y1), (c_x2, c_y2), COLOR_BORDER, thickness=2)
 
             cv2.putText(frame, "Controls", (c_x1 + 25, c_y1 + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.70, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
             cv2.line(frame, (c_x1 + 25, c_y1 + 48), (c_x2 - 25, c_y1 + 48), COLOR_BORDER, 1, cv2.LINE_AA)
@@ -1058,8 +1037,8 @@ def main():
             v_x1, v_y1 = cx - v_box_w // 2, cy - v_box_h // 2
             v_x2, v_y2 = cx + v_box_w // 2, cy + v_box_h // 2
 
-            draw_rounded_rect(frame, (v_x1, v_y1), (v_x2, v_y2), COLOR_OVERLAY_BG, thickness=-1, radius=16)
-            draw_rounded_rect(frame, (v_x1, v_y1), (v_x2, v_y2), COLOR_BORDER, thickness=2, radius=16)
+            draw_rect(frame, (v_x1, v_y1), (v_x2, v_y2), COLOR_OVERLAY_BG, thickness=-1)
+            draw_rect(frame, (v_x1, v_y1), (v_x2, v_y2), COLOR_BORDER, thickness=2)
 
             cv2.putText(frame, "Pick a voice", (v_x1 + 25, v_y1 + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.70, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
             cv2.line(frame, (v_x1 + 25, v_y1 + 48), (v_x2 - 25, v_y1 + 48), COLOR_BORDER, 1, cv2.LINE_AA)
@@ -1068,7 +1047,7 @@ def main():
                 btn_top = cy - 30 + (idx * 45)
                 btn_color = COLOR_SAGE if tts.voice_idx == idx else COLOR_SAND
                 txt_color = (255, 255, 255) if tts.voice_idx == idx else COLOR_TEXT_DARK
-                draw_pill_button(frame, (cx - 180, btn_top), (cx + 180, btn_top + 35), btn_color, voice_name, text_color=txt_color, font_scale=0.52)
+                draw_button(frame, (cx - 180, btn_top), (cx + 180, btn_top + 35), btn_color, voice_name, text_color=txt_color, font_scale=0.52)
 
         cv2.imshow(window_name, frame)
 
