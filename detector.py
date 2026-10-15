@@ -480,8 +480,6 @@ def main():
     finished_word = ""
     word_history = []
 
-    open_hand_start_time = None
-    open_hand_triggered = False
     space_start_time = None
     space_triggered = False
 
@@ -490,7 +488,6 @@ def main():
     prev_wrist_pos = None
 
     HOLD_LETTER_DURATION = 2.0 
-    TOGGLE_GESTURE_DURATION = 1.2 
     ACTION_GESTURE_DURATION = 1.0
 
     start_time_ms = int(time.time() * 1000)
@@ -577,7 +574,6 @@ def main():
                             punct_sub = None
                         else:
                             finished_word = ""
-                    open_hand_start_time = None
                 else:
                     keyboard_editing_active = False
                     live_text, live_status, is_listening = stt_thread.get_data()
@@ -773,24 +769,6 @@ def main():
                 else:
                     space_start_time, space_triggered = None, False
 
-                if current_mode == "SPELL" and open_hand and not space_gesture_detected and hand_movement < 0.035 and app_view == "SIGN":
-                    if open_hand_start_time is None: open_hand_start_time = time.time()
-                    elif (time.time() - open_hand_start_time >= TOGGLE_GESTURE_DURATION) and not open_hand_triggered:
-                        open_hand_triggered = True
-                        is_recording = not is_recording
-                        if is_recording:
-                            current_word, finished_word = "", ""
-                            selecting_punctuation, punct_sub, selecting_tense, selecting_synonym = False, None, False, False
-                            word_sequence_buffer.clear()
-                            last_word_pred_time = 0.0
-                        else:
-                            if current_word.strip():
-                                selecting_punctuation, punct_sub = True, None
-                            else: finished_word = ""
-                        open_hand_start_time = None
-                else:
-                    open_hand_start_time, open_hand_triggered = None, False
-
                 raw_pts = np.array([[lm.x, lm.y, lm.z] for lm in primary_hand])
                 if smoothed_landmarks is None:
                     smoothed_landmarks = raw_pts
@@ -810,11 +788,11 @@ def main():
             else:
                 smoothed_landmarks = None
                 bg_ai.update_data(None, None)
-                open_hand_start_time, space_start_time, letter_hold_start_time, current_holding_letter, prev_wrist_pos = None, None, None, None, None
+                space_start_time, letter_hold_start_time, current_holding_letter, prev_wrist_pos = None, None, None, None
         else:
             smoothed_landmarks = None
             bg_ai.update_data(None, None)
-            open_hand_start_time, space_start_time, letter_hold_start_time, current_holding_letter, prev_wrist_pos = None, None, None, None, None
+            space_start_time, letter_hold_start_time, current_holding_letter, prev_wrist_pos = None, None, None, None
 
         if is_recording and not open_hand and not space_gesture_detected and hand_detected and not selecting_synonym and app_view == "SIGN":
             if current_mode == "SPELL":
@@ -1126,13 +1104,31 @@ def main():
                 current_mode = "WORD" if current_mode == "SPELL" else "SPELL"
                 word_sequence_buffer.clear()
                 last_word_pred_time = 0.0
-            elif key == ord('s') and app_view == "SIGN":
-                current_mode = "WORD"
-                is_recording = True
-                current_word = ""
-                finished_word = ""
-                word_sequence_buffer.clear()
-                last_word_pred_time = 0.0
+            elif key == ord('s'):
+                if app_view == "SIGN":
+                    is_recording = not is_recording
+                    if is_recording:
+                        current_word = ""
+                        finished_word = ""
+                        selecting_punctuation = False
+                        punct_sub = None
+                        selecting_tense = False
+                        selecting_synonym = False
+                        word_sequence_buffer.clear()
+                        last_word_pred_time = 0.0
+                    else:
+                        if current_word.strip():
+                            selecting_punctuation = True
+                            punct_sub = None
+                        else:
+                            finished_word = ""
+                else:
+                    keyboard_editing_active = False
+                    live_text, live_status, is_listening = stt_thread.get_data()
+                    if is_listening:
+                        stt_thread.stop_listening()
+                    else:
+                        stt_thread.start_listening()
 
     cap.release()
     cv2.destroyAllWindows()
