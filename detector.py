@@ -38,7 +38,9 @@ COLOR_TEXT_DARK = (40, 40, 40)
 COLOR_TEXT_MUTED = (120, 120, 120)
 COLOR_SAGE = (120, 170, 130)
 COLOR_ROSE = (120, 120, 220)
-COLOR_TERRACOTTA = (70, 110, 210)
+COLOR_PURPLE = (180, 80, 140)
+COLOR_BLUE = (220, 140, 60)
+COLOR_PINK = (180, 130, 240)
 COLOR_SAND = (180, 210, 230)
 COLOR_OVERLAY_BG = (250, 250, 250)
 
@@ -211,7 +213,7 @@ def draw_pill_button(img, pt1, pt2, bg_color, text, text_color=(40, 40, 40), fon
     cv2.putText(img, text, (cx - t_size[0] // 2, cy + t_size[1] // 2), 
                 cv2.FONT_HERSHEY_SIMPLEX, font_scale, text_color, 2, cv2.LINE_AA)
 
-def draw_progress_bar(img, pt1, pt2, ratio, color=COLOR_TERRACOTTA):
+def draw_progress_bar(img, pt1, pt2, ratio, color=COLOR_PURPLE):
     draw_rounded_rect(img, pt1, pt2, (220, 220, 220), thickness=-1, radius=4)
     w = pt2[0] - pt1[0]
     fill_x2 = pt1[0] + int(w * min(max(ratio, 0.0), 1.0))
@@ -715,7 +717,7 @@ def main():
             for idx in KEY_ARM_INDICES:
                 lm = pose_lms[idx]
                 if lm.visibility > 0.5:
-                    cv2.circle(frame, (int(lm.x * w), int(lm.y * h)), 6, COLOR_TERRACOTTA, -1, cv2.LINE_AA)
+                    cv2.circle(frame, (int(lm.x * w), int(lm.y * h)), 6, COLOR_PURPLE, -1, cv2.LINE_AA)
 
         hand_detected = False
         space_gesture_detected = False
@@ -778,7 +780,7 @@ def main():
                         end_p = (int(hand_landmarks[connection[1]].x * w), int(hand_landmarks[connection[1]].y * h))
                         cv2.line(frame, start_p, end_p, (230, 235, 240), 2, cv2.LINE_AA)
                     for landmark in hand_landmarks:
-                        cv2.circle(frame, (int(landmark.x * w), int(landmark.y * h)), 4, COLOR_TERRACOTTA, -1, cv2.LINE_AA)
+                        cv2.circle(frame, (int(landmark.x * w), int(landmark.y * h)), 4, COLOR_PURPLE, -1, cv2.LINE_AA)
             else:
                 smoothed_landmarks = None
                 bg_ai.update_data(None, None)
@@ -838,7 +840,7 @@ def main():
         else:
             letter_hold_start_time, current_holding_letter = None, None
 
-        view_bg = COLOR_TERRACOTTA if app_view == "SIGN" else COLOR_SAGE
+        view_bg = COLOR_PURPLE if app_view == "SIGN" else COLOR_SAGE
         draw_pill_button(frame, (w - 710, 20), (w - 560, 55), view_bg, f"MODE: {app_view}", text_color=(255, 255, 255), font_scale=0.45)
 
         if app_view == "SIGN":
@@ -846,12 +848,12 @@ def main():
             rec_btn_text = "STOP" if is_recording else "START REC"
             draw_pill_button(frame, (w - 550, 20), (w - 420, 55), rec_bg, rec_btn_text, text_color=(255, 255, 255), font_scale=0.50)
 
-            mode_bg = COLOR_TERRACOTTA if current_mode == "SPELL" else COLOR_SAND
+            mode_bg = COLOR_PURPLE if current_mode == "SPELL" else COLOR_SAND
             mode_txt_color = (255, 255, 255) if current_mode == "SPELL" else COLOR_TEXT_DARK
             draw_pill_button(frame, (w - 410, 20), (w - 280, 55), mode_bg, f"SIGN: {current_mode}", text_color=mode_txt_color, font_scale=0.45)
 
-            draw_pill_button(frame, (w - 270, 20), (w - 150, 55), COLOR_SAND, "DELETE", text_color=COLOR_TEXT_DARK, font_scale=0.55)
-            draw_pill_button(frame, (w - 140, 20), (w - 20, 55), COLOR_ROSE, "CLEAR", text_color=(255, 255, 255), font_scale=0.55)
+            draw_pill_button(frame, (w - 270, 20), (w - 150, 55), COLOR_BLUE, "DELETE", text_color=(255, 255, 255), font_scale=0.55)
+            draw_pill_button(frame, (w - 140, 20), (w - 20, 55), COLOR_PINK, "CLEAR", text_color=(255, 255, 255), font_scale=0.55)
 
             if current_mode == "SPELL":
                 draw_rounded_rect(frame, (20, 20), (200, 65), COLOR_BG_CARD, thickness=-1, radius=10)
@@ -862,7 +864,7 @@ def main():
             draw_rounded_rect(frame, (215, 20), (415, 65), COLOR_BG_CARD, thickness=-1, radius=10)
             draw_rounded_rect(frame, (215, 20), (415, 65), COLOR_BORDER, thickness=1, radius=10)
             cv2.putText(frame, "EMOTION INTENSITY", (227, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.38, COLOR_TEXT_MUTED, 1, cv2.LINE_AA)
-            cv2.putText(frame, f"{intensity_label} ({intensity_mult}x)", (227, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.52, COLOR_SAGE if intensity_label == "NEUTRAL" else COLOR_TERRACOTTA, 2, cv2.LINE_AA)
+            cv2.putText(frame, f"{intensity_label} ({intensity_mult}x)", (227, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.52, COLOR_SAGE if intensity_label == "NEUTRAL" else COLOR_PURPLE, 2, cv2.LINE_AA)
 
             if is_recording:
                 draw_rounded_rect(frame, (20, 80), (430, 160), COLOR_BG_CARD, thickness=-1, radius=12)
@@ -876,7 +878,7 @@ def main():
                     letter_elapsed = min(time.time() - letter_hold_start_time, HOLD_LETTER_DURATION)
                     l_ratio = letter_elapsed / HOLD_LETTER_DURATION
                     cv2.putText(frame, f"Holding ('{current_holding_letter}')...", (20, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLOR_TEXT_DARK, 1, cv2.LINE_AA)
-                    draw_progress_bar(frame, (20, 188), (220, 200), l_ratio, color=COLOR_TERRACOTTA)
+                    draw_progress_bar(frame, (20, 188), (220, 200), l_ratio, color=COLOR_PURPLE)
 
                 elif current_mode == "WORD" and asl_word_model is not None:
                     buf_len = len(word_sequence_buffer)
@@ -905,7 +907,7 @@ def main():
 
                 if len(synonym_options) >= 2:
                     opt2 = synonym_options[1]
-                    draw_pill_button(frame, (cx + 10, cy - 10), (cx + 210, cy - 10 + btn_h), COLOR_TERRACOTTA, opt2, text_color=(255, 255, 255), font_scale=0.6)
+                    draw_pill_button(frame, (cx + 10, cy - 10), (cx + 210, cy - 10 + btn_h), COLOR_PURPLE, opt2, text_color=(255, 255, 255), font_scale=0.6)
 
             if selecting_punctuation:
                 box_w, box_h = 700, 180
@@ -921,7 +923,7 @@ def main():
 
                     draw_pill_button(frame, (cx - 320, cy - 10), (cx - 120, cy + 50), COLOR_SAND, ". (Period)", text_color=COLOR_TEXT_DARK, font_scale=0.55)
                     draw_pill_button(frame, (cx - 100, cy - 10), (cx + 100, cy + 50), COLOR_SAGE, "! (Exclamation)", text_color=(255, 255, 255), font_scale=0.55)
-                    draw_pill_button(frame, (cx + 120, cy - 10), (cx + 320, cy + 50), COLOR_TERRACOTTA, "? (Question)", text_color=(255, 255, 255), font_scale=0.55)
+                    draw_pill_button(frame, (cx + 120, cy - 10), (cx + 320, cy + 50), COLOR_PURPLE, "? (Question)", text_color=(255, 255, 255), font_scale=0.55)
 
                 elif punct_sub == "PERIOD":
                     title = "PERIOD (.) INTENT & TONE"
@@ -930,7 +932,7 @@ def main():
 
                     draw_pill_button(frame, (cx - 300, cy - 10), (cx - 110, cy + 50), COLOR_SAND, "Neutral", text_color=COLOR_TEXT_DARK, font_scale=0.55)
                     draw_pill_button(frame, (cx - 95, cy - 10), (cx + 95, cy + 50), COLOR_ROSE, "Sad", text_color=(255, 255, 255), font_scale=0.55)
-                    draw_pill_button(frame, (cx + 110, cy - 10), (cx + 300, cy + 50), COLOR_TERRACOTTA, "Sarcastic", text_color=(255, 255, 255), font_scale=0.55)
+                    draw_pill_button(frame, (cx + 110, cy - 10), (cx + 300, cy + 50), COLOR_PURPLE, "Sarcastic", text_color=(255, 255, 255), font_scale=0.55)
 
                 elif punct_sub == "EXCLAMATION":
                     title = "EXCLAMATION (!) TONE"
@@ -938,7 +940,7 @@ def main():
                     cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
 
                     draw_pill_button(frame, (cx - 200, cy - 10), (cx - 10, cy + 50), COLOR_SAGE, "Happy", text_color=(255, 255, 255), font_scale=0.55)
-                    draw_pill_button(frame, (cx + 10, cy - 10), (cx + 200, cy + 50), COLOR_TERRACOTTA, "Angry", text_color=(255, 255, 255), font_scale=0.55)
+                    draw_pill_button(frame, (cx + 10, cy - 10), (cx + 200, cy + 50), COLOR_PURPLE, "Angry", text_color=(255, 255, 255), font_scale=0.55)
 
                 elif punct_sub == "QUESTION":
                     title = "QUESTION (?) TONE"
@@ -946,7 +948,7 @@ def main():
                     cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
 
                     draw_pill_button(frame, (cx - 200, cy - 10), (cx - 10, cy + 50), COLOR_SAND, "Surprised", text_color=COLOR_TEXT_DARK, font_scale=0.55)
-                    draw_pill_button(frame, (cx + 10, cy - 10), (cx + 200, cy + 50), COLOR_TERRACOTTA, "Sarcastic", text_color=(255, 255, 255), font_scale=0.55)
+                    draw_pill_button(frame, (cx + 10, cy - 10), (cx + 200, cy + 50), COLOR_PURPLE, "Sarcastic", text_color=(255, 255, 255), font_scale=0.55)
 
             if selecting_tense:
                 box_w, box_h = 520, 180
@@ -960,7 +962,7 @@ def main():
                 cv2.putText(frame, title, (cx - t_size[0] // 2, cy - 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
 
                 draw_pill_button(frame, (cx - 210, cy - 10), (cx - 10, cy + 35), COLOR_SAGE, "PRESENT (NOW)", text_color=(255, 255, 255), font_scale=0.5)
-                draw_pill_button(frame, (cx + 10, cy - 10), (cx + 210, cy + 35), COLOR_TERRACOTTA, "PAST", text_color=(255, 255, 255), font_scale=0.5)
+                draw_pill_button(frame, (cx + 10, cy - 10), (cx + 210, cy + 35), COLOR_PURPLE, "PAST", text_color=(255, 255, 255), font_scale=0.5)
                 draw_pill_button(frame, (cx - 210, cy + 50), (cx - 10, cy + 95), COLOR_SAND, "FUTURE", text_color=COLOR_TEXT_DARK, font_scale=0.5)
                 draw_pill_button(frame, (cx + 10, cy + 50), (cx + 210, cy + 95), COLOR_ROSE, "ORIGINAL", text_color=(255, 255, 255), font_scale=0.5)
 
@@ -974,7 +976,7 @@ def main():
                 cv2.putText(frame, f"TRANSLATION: \"{finished_word}\"", (m_x1 + 20, m_y1 + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
 
                 draw_pill_button(frame, (cx - 305, cy + 60), (cx - 115, cy + 105), COLOR_SAGE, "SPEAK AGAIN", text_color=(255, 255, 255), font_scale=0.5)
-                draw_pill_button(frame, (cx - 95, cy + 60), (cx + 95, cy + 105), COLOR_TERRACOTTA, "CHANGE TONE", text_color=(255, 255, 255), font_scale=0.5)
+                draw_pill_button(frame, (cx - 95, cy + 60), (cx + 95, cy + 105), COLOR_PURPLE, "CHANGE TONE", text_color=(255, 255, 255), font_scale=0.5)
                 draw_pill_button(frame, (cx + 115, cy + 60), (cx + 305, cy + 105), COLOR_ROSE, "DISMISS", text_color=(255, 255, 255), font_scale=0.5)
 
         else:
@@ -983,7 +985,7 @@ def main():
             mic_bg = COLOR_ROSE if is_listening else COLOR_SAGE
             mic_text = "PAUSE MIC" if is_listening else "START MIC"
             draw_pill_button(frame, (w - 550, 20), (w - 420, 55), mic_bg, mic_text, text_color=(255, 255, 255), font_scale=0.50)
-            draw_pill_button(frame, (w - 140, 20), (w - 20, 55), COLOR_ROSE, "CLEAR", text_color=(255, 255, 255), font_scale=0.55)
+            draw_pill_button(frame, (w - 140, 20), (w - 20, 55), COLOR_PINK, "CLEAR", text_color=(255, 255, 255), font_scale=0.55)
 
             card_w, card_h = 920, 380
             c_x1, c_y1 = cx - card_w // 2, cy - card_h // 2 + 30
@@ -995,7 +997,7 @@ def main():
             cv2.putText(frame, "LIVE TRANSCRIPTION FOR DEAF / HARD OF HEARING USER", (c_x1 + 25, c_y1 + 45), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.60, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
             
-            status_color = COLOR_SAGE if is_listening else COLOR_TERRACOTTA
+            status_color = COLOR_SAGE if is_listening else COLOR_PURPLE
             cv2.putText(frame, f"STATUS: {live_status}", (c_x1 + 25, c_y1 + 75), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, status_color, 2, cv2.LINE_AA)
 
