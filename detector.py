@@ -579,6 +579,7 @@ def main():
                             finished_word = ""
                     open_hand_start_time = None
                 else:
+                    keyboard_editing_active = False
                     live_text, live_status, is_listening = stt_thread.get_data()
                     if is_listening:
                         stt_thread.stop_listening()
@@ -599,6 +600,8 @@ def main():
                     current_word = current_word[:-1]
                 else:
                     keyboard_editing_active = not keyboard_editing_active
+                    if keyboard_editing_active:
+                        stt_thread.stop_listening()
 
             elif (w - 140) <= mx <= (w - 20) and 20 <= my <= 55:
                 if app_view == "SIGN":
@@ -1028,7 +1031,7 @@ def main():
             cv2.putText(frame, "LIVE TRANSCRIPTION FOR DEAF / HARD OF HEARING USER", (c_x1 + 25, c_y1 + 45), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.60, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
             
-            status_disp = "KEYBOARD INPUT ACTIVE (Press ENTER or Click KEYBOARD to finish)" if keyboard_editing_active else f"STATUS: {live_status}"
+            status_disp = "KEYBOARD EDIT ACTIVE (Press ENTER to finish)" if keyboard_editing_active else f"STATUS: {live_status}"
             status_color = COLOR_SAGE if (is_listening or keyboard_editing_active) else COLOR_PURPLE
             cv2.putText(frame, status_disp, (c_x1 + 25, c_y1 + 75), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.42, status_color, 2, cv2.LINE_AA)
@@ -1093,12 +1096,13 @@ def main():
 
         key = cv2.waitKey(1) & 0xFF
         if app_view == "TRANSCRIPTION" and keyboard_editing_active:
-            if key == 13 or key == 27:
-                keyboard_editing_active = False
-            elif key in (8, 127, 255):
-                stt_thread.delete_last_char()
-            elif 32 <= key <= 126:
-                stt_thread.append_text(chr(key))
+            if key != 255:
+                if key in (13, 27):
+                    keyboard_editing_active = False
+                elif key in (8, 127):
+                    stt_thread.delete_last_char()
+                elif 32 <= key <= 126:
+                    stt_thread.append_text(chr(key))
         else:
             if key == ord('q'):
                 bg_ai.running = False
