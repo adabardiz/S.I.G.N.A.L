@@ -329,6 +329,23 @@ class SpeechToTextThread(threading.Thread):
         with self.lock:
             self.transcript = ""
 
+    def delete_last_word(self):
+        with self.lock:
+            words = self.transcript.strip().split()
+            if words:
+                self.transcript = " ".join(words[:-1])
+            else:
+                self.transcript = ""
+
+    def delete_last_char(self):
+        with self.lock:
+            if self.transcript:
+                self.transcript = self.transcript[:-1]
+
+    def append_text(self, char):
+        with self.lock:
+            self.transcript += char
+
     def get_data(self):
         with self.lock:
             return self.transcript, self.status, self.listening
@@ -437,6 +454,7 @@ def main():
     cv2.setMouseCallback(window_name, on_mouse_click)
 
     app_view = "SIGN" 
+    keyboard_editing_active = False
 
     current_mode = "SPELL"
     word_sequence_buffer = deque(maxlen=30)
@@ -539,6 +557,7 @@ def main():
                 else:
                     app_view = "SIGN"
                     stt_thread.stop_listening()
+                    keyboard_editing_active = False
 
             elif (w - 550) <= mx <= (w - 420) and 20 <= my <= 55:
                 if app_view == "SIGN":
@@ -572,6 +591,14 @@ def main():
                     selecting_synonym = False
                     word_sequence_buffer.clear()
                     last_word_pred_time = 0.0
+                else:
+                    stt_thread.delete_last_word()
+
+            elif (w - 270) <= mx <= (w - 150) and 20 <= my <= 55:
+                if app_view == "SIGN":
+                    current_word = current_word[:-1]
+                else:
+                    keyboard_editing_active = not keyboard_editing_active
 
             elif (w - 140) <= mx <= (w - 20) and 20 <= my <= 55:
                 if app_view == "SIGN":
@@ -583,10 +610,6 @@ def main():
                     selecting_synonym = False
                 else:
                     stt_thread.clear_transcript()
-
-            elif (w - 270) <= mx <= (w - 150) and 20 <= my <= 55:
-                if app_view == "SIGN":
-                    current_word = current_word[:-1]
 
             elif selecting_synonym and app_view == "SIGN":
                 btn_y1, btn_y2 = cy - 10, cy + 50
@@ -985,6 +1008,14 @@ def main():
             mic_bg = COLOR_ROSE if is_listening else COLOR_SAGE
             mic_text = "PAUSE MIC" if is_listening else "START MIC"
             draw_pill_button(frame, (w - 550, 20), (w - 420, 55), mic_bg, mic_text, text_color=(255, 255, 255), font_scale=0.50)
+            
+            draw_pill_button(frame, (w - 410, 20), (w - 280, 55), COLOR_BLUE, "DEL WORD", text_color=(255, 255, 255), font_scale=0.50)
+
+            kbd_bg = COLOR_SAGE if keyboard_editing_active else COLOR_SAND
+            kbd_txt_col = (255, 255, 255) if keyboard_editing_active else COLOR_TEXT_DARK
+            kbd_label = "EDITING..." if keyboard_editing_active else "KEYBOARD"
+            draw_pill_button(frame, (w - 270, 20), (w - 150, 55), kbd_bg, kbd_label, text_color=kbd_txt_col, font_scale=0.45)
+
             draw_pill_button(frame, (w - 140, 20), (w - 20, 55), COLOR_PINK, "CLEAR", text_color=(255, 255, 255), font_scale=0.55)
 
             card_w, card_h = 920, 380
@@ -997,14 +1028,20 @@ def main():
             cv2.putText(frame, "LIVE TRANSCRIPTION FOR DEAF / HARD OF HEARING USER", (c_x1 + 25, c_y1 + 45), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.60, COLOR_TEXT_DARK, 2, cv2.LINE_AA)
             
-            status_color = COLOR_SAGE if is_listening else COLOR_PURPLE
-            cv2.putText(frame, f"STATUS: {live_status}", (c_x1 + 25, c_y1 + 75), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, status_color, 2, cv2.LINE_AA)
+            status_disp = "KEYBOARD INPUT ACTIVE (Press ENTER or Click KEYBOARD to finish)" if keyboard_editing_active else f"STATUS: {live_status}"
+            status_color = COLOR_SAGE if (is_listening or keyboard_editing_active) else COLOR_PURPLE
+            cv2.putText(frame, status_disp, (c_x1 + 25, c_y1 + 75), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.42, status_color, 2, cv2.LINE_AA)
 
             cv2.line(frame, (c_x1 + 25, c_y1 + 95), (c_x2 - 25, c_y1 + 95), COLOR_BORDER, 1, cv2.LINE_AA)
 
-            disp_transcript = live_text if live_text else "Waiting for hearing person to speak..."
-            txt_color = COLOR_TEXT_DARK if live_text else COLOR_TEXT_MUTED
+            disp_transcript = live_text
+            if keyboard_editing_active:
+                disp_transcript += "|"
+            elif not live_text:
+                disp_transcript = "Waiting for hearing person to speak..."
+
+            txt_color = COLOR_TEXT_DARK if (live_text or keyboard_editing_active) else COLOR_TEXT_MUTED
             draw_wrapped_text(frame, disp_transcript, (c_x1 + 25, c_y1 + 135), card_w - 50, 
                               cv2.FONT_HERSHEY_SIMPLEX, 0.75, txt_color, 2, line_spacing=38)
 
@@ -1055,34 +1092,43 @@ def main():
         cv2.imshow(window_name, frame)
 
         key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'):
-            bg_ai.running = False
-            stt_thread.running = False
-            break
-        elif key == ord('t'):
-            if app_view == "SIGN":
-                app_view = "TRANSCRIPTION"
-                stt_thread.start_listening()
-            else:
-                app_view = "SIGN"
-                stt_thread.stop_listening()
-        elif key == ord('v'):
-            show_voices_popup = not show_voices_popup
-            show_controls_popup = False
-        elif key == ord('c'):
-            show_controls_popup = not show_controls_popup
-            show_voices_popup = False
-        elif key == ord('m') and app_view == "SIGN":
-            current_mode = "WORD" if current_mode == "SPELL" else "SPELL"
-            word_sequence_buffer.clear()
-            last_word_pred_time = 0.0
-        elif key == ord('s') and app_view == "SIGN":
-            current_mode = "WORD"
-            is_recording = True
-            current_word = ""
-            finished_word = ""
-            word_sequence_buffer.clear()
-            last_word_pred_time = 0.0
+        if app_view == "TRANSCRIPTION" and keyboard_editing_active:
+            if key == 13 or key == 27:
+                keyboard_editing_active = False
+            elif key in (8, 127, 255):
+                stt_thread.delete_last_char()
+            elif 32 <= key <= 126:
+                stt_thread.append_text(chr(key))
+        else:
+            if key == ord('q'):
+                bg_ai.running = False
+                stt_thread.running = False
+                break
+            elif key == ord('t'):
+                if app_view == "SIGN":
+                    app_view = "TRANSCRIPTION"
+                    stt_thread.start_listening()
+                else:
+                    app_view = "SIGN"
+                    stt_thread.stop_listening()
+                    keyboard_editing_active = False
+            elif key == ord('v'):
+                show_voices_popup = not show_voices_popup
+                show_controls_popup = False
+            elif key == ord('c'):
+                show_controls_popup = not show_controls_popup
+                show_voices_popup = False
+            elif key == ord('m') and app_view == "SIGN":
+                current_mode = "WORD" if current_mode == "SPELL" else "SPELL"
+                word_sequence_buffer.clear()
+                last_word_pred_time = 0.0
+            elif key == ord('s') and app_view == "SIGN":
+                current_mode = "WORD"
+                is_recording = True
+                current_word = ""
+                finished_word = ""
+                word_sequence_buffer.clear()
+                last_word_pred_time = 0.0
 
     cap.release()
     cv2.destroyAllWindows()
