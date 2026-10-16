@@ -9,6 +9,7 @@ import time
 import threading
 import os
 import joblib
+import re
 from collections import deque
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
@@ -802,9 +803,17 @@ def main():
                             predicted_word = asl_word_model.predict([aggregated_vec])[0]
                             if predicted_word:
                                 raw_word_str = str(predicted_word).strip()
-                                
-                                has_emotion_tag = False
                                 word_str = raw_word_str
+
+                                has_emotion_tag = False
+                                if word_str.lower().endswith("_e") or "(e)" in word_str.lower():
+                                    has_emotion_tag = True
+                                    if word_str.lower().endswith("_e"):
+                                        word_str = word_str[:-2].strip()
+                                    word_str = word_str.replace("(e)", "").replace("(E)", "").strip()
+
+                                word_str = re.sub(r'(_v\d+|_v_\d+|_\d+)$', '', word_str, flags=re.IGNORECASE).strip()
+
                                 if word_str.lower().endswith("_e") or "(e)" in word_str.lower():
                                     has_emotion_tag = True
                                     if word_str.lower().endswith("_e"):
