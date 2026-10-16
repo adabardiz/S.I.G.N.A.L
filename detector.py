@@ -491,7 +491,11 @@ def main():
     smoothed_landmarks = None
     alpha = 0.70
 
+    TARGET_FPS = 30
+    TARGET_FRAME_TIME = 1.0 / TARGET_FPS
+
     while True:
+        loop_start_time = time.time()
         ret, frame = cap.read()
         if not ret or frame is None:
             continue
@@ -690,96 +694,103 @@ def main():
                     current_word = ""
 
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
         
-        frame_timestamp_ms = int(time.time() * 1000) - start_time_ms
-        if frame_timestamp_ms <= last_timestamp_ms:
-            frame_timestamp_ms = last_timestamp_ms + 1
-        last_timestamp_ms = frame_timestamp_ms
-
-        detection_result = detector.detect_for_video(mp_image, frame_timestamp_ms)
-
-        if frame_counter % 2 == 0:
-            face_results = face_mesh.process(rgb_frame)
-            cached_face_lms = face_results.multi_face_landmarks[0].landmark if face_results.multi_face_landmarks else None
-            cached_face_feats = extract_face_features(cached_face_lms)
-
-            pose_results = pose.process(rgb_frame)
-            cached_pose_lms = pose_results.pose_landmarks.landmark if pose_results.pose_landmarks else None
-            cached_arm_feats = extract_arm_features(cached_pose_lms)
-            cached_intensity_mult, cached_intensity_label = calculate_facial_intensity(cached_face_lms)
-
-        face_lms = cached_face_lms
-        face_feats = cached_face_feats
-        pose_lms = cached_pose_lms
-        arm_feats = cached_arm_feats
-        intensity_mult, intensity_label = cached_intensity_mult, cached_intensity_label
-
-        if pose_lms:
-            for start_idx, end_idx in ARM_CONNECTIONS:
-                s_lm = pose_lms[start_idx]
-                e_lm = pose_lms[end_idx]
-                if s_lm.visibility > 0.5 and e_lm.visibility > 0.5:
-                    start_p = (int(s_lm.x * w), int(s_lm.y * h))
-                    end_p = (int(e_lm.x * w), int(e_lm.y * h))
-                    cv2.line(frame, start_p, end_p, (200, 200, 200), 3, cv2.LINE_AA)
-            for idx in KEY_ARM_INDICES:
-                lm = pose_lms[idx]
-                if lm.visibility > 0.5:
-                    cv2.circle(frame, (int(lm.x * w), int(lm.y * h)), 6, COLOR_PURPLE, -1, cv2.LINE_AA)
-
         hand_detected = False
         space_gesture_detected = False
         open_hand = False
         features = None
 
-        if detection_result.hand_landmarks:
-            valid_hands = [h for h in detection_result.hand_landmarks if is_valid_hand_shape(h)]
-            if valid_hands:
-                hand_detected = True
-                primary_hand = valid_hands[0]
-                curr_wrist = np.array([primary_hand[0].x, primary_hand[0].y])
-                hand_movement = np.linalg.norm(curr_wrist - prev_wrist_pos) if prev_wrist_pos is not None else 0.0
-                prev_wrist_pos = curr_wrist
+        if app_view == "SIGN":
+            small_rgb = cv2.resize(rgb_frame, (640, 360))
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=small_rgb)
+            
+            frame_timestamp_ms = int(time.time() * 1000) - start_time_ms
+            if frame_timestamp_ms <= last_timestamp_ms:
+                frame_timestamp_ms = last_timestamp_ms + 1
+            last_timestamp_ms = frame_timestamp_ms
 
-                if len(valid_hands) >= 2:
-                    space_gesture_detected = is_two_open_hands(valid_hands[0], valid_hands[1])
+            detection_result = detector.detect_for_video(mp_image, frame_timestamp_ms)
 
-                if not space_gesture_detected:
-                    open_hand = is_open_hand(primary_hand)
+            #run face & pose every 3 frames 
+            if frame_counter % 3 == 0:
+                face_results = face_mesh.process(small_rgb)
+                cached_face_lms = face_results.multi_face_landmarks[0].landmark if face_results.multi_face_landmarks else None
+                cached_face_feats = extract_face_features(cached_face_lms)
 
-                if is_recording and space_gesture_detected and app_view == "SIGN":
-                    if space_start_time is None: space_start_time = time.time()
-                    elif (time.time() - space_start_time >= ACTION_GESTURE_DURATION) and not space_triggered:
-                        current_word += " "
-                        space_triggered = True
+                pose_results = pose.process(small_rgb)
+                cached_pose_lms = pose_results.pose_landmarks.landmark if pose_results.pose_landmarks else None
+                cached_arm_feats = extract_arm_features(cached_pose_lms)
+                cached_intensity_mult, cached_intensity_label = calculate_facial_intensity(cached_face_lms)
+
+            face_lms = cached_face_lms
+            face_feats = cached_face_feats
+            pose_lms = cached_pose_lms
+            arm_feats = cached_arm_feats
+            intensity_mult, intensity_label = cached_intensity_mult, cached_intensity_label
+
+            if pose_lms:
+                for start_idx, end_idx in ARM_CONNECTIONS:
+                    s_lm = pose_lms[start_idx]
+                    e_lm = pose_lms[end_idx]
+                    if s_lm.visibility > 0.5 and e_lm.visibility > 0.5:
+                        start_p = (int(s_lm.x * w), int(s_lm.y * h))
+                        end_p = (int(e_lm.x * w), int(e_lm.y * h))
+                        cv2.line(frame, start_p, end_p, (200, 200, 200), 3, cv2.LINE_AA)
+                for idx in KEY_ARM_INDICES:
+                    lm = pose_lms[idx]
+                    if lm.visibility > 0.5:
+                        cv2.circle(frame, (int(lm.x * w), int(lm.y * h)), 6, COLOR_PURPLE, -1, cv2.LINE_AA)
+
+            if detection_result.hand_landmarks:
+                valid_hands = [h for h in detection_result.hand_landmarks if is_valid_hand_shape(h)]
+                if valid_hands:
+                    hand_detected = True
+                    primary_hand = valid_hands[0]
+                    curr_wrist = np.array([primary_hand[0].x, primary_hand[0].y])
+                    hand_movement = np.linalg.norm(curr_wrist - prev_wrist_pos) if prev_wrist_pos is not None else 0.0
+                    prev_wrist_pos = curr_wrist
+
+                    if len(valid_hands) >= 2:
+                        space_gesture_detected = is_two_open_hands(valid_hands[0], valid_hands[1])
+
+                    if not space_gesture_detected:
+                        open_hand = is_open_hand(primary_hand)
+
+                    if is_recording and space_gesture_detected:
+                        if space_start_time is None: space_start_time = time.time()
+                        elif (time.time() - space_start_time >= ACTION_GESTURE_DURATION) and not space_triggered:
+                            current_word += " "
+                            space_triggered = True
+                    else:
+                        space_start_time, space_triggered = None, False
+
+                    raw_pts = np.array([[lm.x, lm.y, lm.z] for lm in primary_hand])
+                    if smoothed_landmarks is None:
+                        smoothed_landmarks = raw_pts
+                    else:
+                        smoothed_landmarks = alpha * raw_pts + (1 - alpha) * smoothed_landmarks
+
+                    features = extract_hand_features(smoothed_landmarks)
+                    bg_ai.update_data(features, primary_hand[0].x)
+
+                    for hand_landmarks in valid_hands:
+                        for connection in HAND_CONNECTIONS:
+                            start_p = (int(hand_landmarks[connection[0]].x * w), int(hand_landmarks[connection[0]].y * h))
+                            end_p = (int(hand_landmarks[connection[1]].x * w), int(hand_landmarks[connection[1]].y * h))
+                            cv2.line(frame, start_p, end_p, (230, 235, 240), 2, cv2.LINE_AA)
+                        for landmark in hand_landmarks:
+                            cv2.circle(frame, (int(landmark.x * w), int(landmark.y * h)), 4, COLOR_PURPLE, -1, cv2.LINE_AA)
                 else:
-                    space_start_time, space_triggered = None, False
-
-                raw_pts = np.array([[lm.x, lm.y, lm.z] for lm in primary_hand])
-                if smoothed_landmarks is None:
-                    smoothed_landmarks = raw_pts
-                else:
-                    smoothed_landmarks = alpha * raw_pts + (1 - alpha) * smoothed_landmarks
-
-                features = extract_hand_features(smoothed_landmarks)
-                bg_ai.update_data(features, primary_hand[0].x)
-
-                for hand_landmarks in valid_hands:
-                    for connection in HAND_CONNECTIONS:
-                        start_p = (int(hand_landmarks[connection[0]].x * w), int(hand_landmarks[connection[0]].y * h))
-                        end_p = (int(hand_landmarks[connection[1]].x * w), int(hand_landmarks[connection[1]].y * h))
-                        cv2.line(frame, start_p, end_p, (230, 235, 240), 2, cv2.LINE_AA)
-                    for landmark in hand_landmarks:
-                        cv2.circle(frame, (int(landmark.x * w), int(landmark.y * h)), 4, COLOR_PURPLE, -1, cv2.LINE_AA)
+                    smoothed_landmarks = None
+                    bg_ai.update_data(None, None)
+                    space_start_time, letter_hold_start_time, current_holding_letter, prev_wrist_pos = None, None, None, None
             else:
                 smoothed_landmarks = None
                 bg_ai.update_data(None, None)
                 space_start_time, letter_hold_start_time, current_holding_letter, prev_wrist_pos = None, None, None, None
         else:
-            smoothed_landmarks = None
             bg_ai.update_data(None, None)
-            space_start_time, letter_hold_start_time, current_holding_letter, prev_wrist_pos = None, None, None, None
+            intensity_mult, intensity_label = 1.0, "NEUTRAL"
 
         if is_recording and not open_hand and not space_gesture_detected and hand_detected and not selecting_synonym and app_view == "SIGN":
             if current_mode == "SPELL":
@@ -1128,6 +1139,11 @@ def main():
                         stt_thread.stop_listening()
                     else:
                         stt_thread.start_listening()
+
+        #micro sleep to cap loop at 30ish fps
+        elapsed = time.time() - loop_start_time
+        if elapsed < TARGET_FRAME_TIME:
+            time.sleep(TARGET_FRAME_TIME - elapsed)
 
     cap.release()
     cv2.destroyAllWindows()
