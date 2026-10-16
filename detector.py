@@ -66,6 +66,13 @@ KEY_FACE_INDICES = [
 KEY_ARM_INDICES = [11, 12, 13, 14, 15, 16]
 ARM_CONNECTIONS = [(11, 12), (11, 13), (13, 15), (12, 14), (14, 16)]
 
+EMOTION_WORDS = {
+    "HAPPY", "SAD", "ANGRY", "MAD", "SCARED", "AFRAID", "SURPRISED",
+    "EXCITED", "TIRED", "ANNOYED", "DISGUSTED", "FEAR", "FEARFUL",
+    "JOY", "JOYFUL", "FURIOUS", "NERVOUS", "UPSET", "PROUD", "JEALOUS",
+    "WORRIED", "LOVE", "HATE", "DEPRESSED", "CALM", "LONELY"
+}
+
 def extract_face_features(face_landmarks):
     if not face_landmarks:
         return [0.0] * (len(KEY_FACE_INDICES) * 3)
@@ -778,7 +785,7 @@ def main():
                 if predicted_letter == current_holding_letter:
                     if letter_hold_start_time and (time.time() - letter_hold_start_time >= HOLD_LETTER_DURATION):
                         current_word += predicted_letter
-                        tts.speak(predicted_letter, tone="neutral", intensity=intensity_mult)
+                        tts.speak(predicted_letter, tone="neutral", intensity=1.0)
                         letter_hold_start_time = time.time()  
                 else:
                     current_holding_letter = predicted_letter
@@ -794,24 +801,28 @@ def main():
                         try:
                             predicted_word = asl_word_model.predict([aggregated_vec])[0]
                             if predicted_word:
-                                word_str = str(predicted_word).strip()
+                                raw_word_str = str(predicted_word).strip()
                                 
-                                is_emotion_word = False
+                                has_emotion_tag = False
+                                word_str = raw_word_str
                                 if word_str.lower().endswith("_e") or "(e)" in word_str.lower():
-                                    is_emotion_word = True
+                                    has_emotion_tag = True
                                     if word_str.lower().endswith("_e"):
                                         word_str = word_str[:-2].strip()
                                     word_str = word_str.replace("(e)", "").replace("(E)", "").strip()
 
+                                is_emotion_word = has_emotion_tag or (word_str.upper() in EMOTION_WORDS)
+
                                 if is_emotion_word and intensity_label == "EXTREME":
-                                    word_str = f"VERY {word_str}"
+                                    if not word_str.upper().startswith("VERY "):
+                                        word_str = f"VERY {word_str}"
 
                                 if "/" in word_str:
                                     synonym_options = [w.strip() for w in word_str.split("/") if w.strip()]
                                     selecting_synonym = True
                                 else:
                                     current_word += f"{word_str} "
-                                    word_tone = word_str.lower() if is_emotion_word else selected_tone
+                                    word_tone = word_str.lower().replace("very ", "") if is_emotion_word else selected_tone
                                     tts.speak(word_str, tone=word_tone, intensity=intensity_mult if is_emotion_word else 1.0)
                         except Exception as e:
                             print("Word prediction error:", e)
