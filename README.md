@@ -2,7 +2,7 @@ S.I.G.N.A.L (Sign Interpretation & Gesture Network Algorithm)
 
 An algorithm that detects sign language, turns it into text (and also reads out individual signs) and then turns it into speech by combining all signs into a logical sentence. (asl Grammar is different from normal spoken grammar so the last step is necessary)
 
-UPDATES DAILY. (hopefully)
+UPDATES DAILY (hopefully)
 
 Daily log:
 
@@ -94,6 +94,8 @@ Day 43: My computer has crashed. It wont run any files, and it won't even save d
 
 Day 44: I have, in fact, figured it out. Today I added live transcription. The algorithm can now switch between transcription and signing. I did this to fully ensure that both communities, hearing and hard-of-hearing/deaf, have a way to communicate with eachother. Redesigned UI in its entirety & made colors more aesthetic yes I'm a sucker for easthetc. I cleaned up the UI towards the end of the session, removed palm start cuz it was really faulty, fixed the voice bug, added a delete & edit button to transcription mode, and made s start whatever mode you're on. This session alone kind of finished my personal project. I also did my first ever intensive testing, which led me to see that my computer heats up a lot after instense use. I'll need to optimize my code soon.
 
-Day 45: I fixed the very logic. Previously, it was adding the emotions logic (adding the very prefix even though no _e). Now it doesn't do that and only applies it to words ending with _e. I fixed the algorithm displaying _v1 & _v2 ( the logic for two/three+ signs for one word) by making it check if the word has _e and if it does, just stripping _v1 etc. 
-IMPORTANT! 
-THINGS TO FIX:ptimize code cuz computer heats up after an hour.
+Day 45: I fixed the very logic. Previously, it was adding the emotions logic (adding the very prefix even though no _e). Now it doesn't do that and only applies it to words ending with _e. I fixed the algorithm displaying _v1 & _v2 ( the logic for two/three+ signs for one word) by making it check if the word has _e and if it does, just stripping _v1 etc. my computer heats up after running detector.py a bit, as aformenetioned and today the key optimizations i made are: 
+- webcam frames are now downscaled before passing to mp models.
+- pause vision models in transcription.
+- face mesh and pose models now sample every 3 frames (frame_counter % 3 == 0)
+- added a micro sleep target frame limiter so the cpu doesnt spin at %100 capacity when the cameras idel
