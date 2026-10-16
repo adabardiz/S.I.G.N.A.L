@@ -94,6 +94,6 @@ Day 43: My computer has crashed. It wont run any files, and it won't even save d
 
 Day 44: I have, in fact, figured it out. Today I added live transcription. The algorithm can now switch between transcription and signing. I did this to fully ensure that both communities, hearing and hard-of-hearing/deaf, have a way to communicate with eachother. Redesigned UI in its entirety & made colors more aesthetic yes I'm a sucker for easthetc. I cleaned up the UI towards the end of the session, removed palm start cuz it was really faulty, fixed the voice bug, added a delete & edit button to transcription mode, and made s start whatever mode you're on. This session alone kind of finished my personal project. I also did my first ever intensive testing, which led me to see that my computer heats up a lot after instense use. I'll need to optimize my code soon.
 
-Day 45: I fixed the very logic. Previously, it was adding the emotions logic (adding the very prefix even though no _e). Now it doesn't do that and only applies it to words ending with _e.
+Day 45: I fixed the very logic. Previously, it was adding the emotions logic (adding the very prefix even though no _e). Now it doesn't do that and only applies it to words ending with _e. I fixed the algorithm displaying _v1 & _v2 ( the logic for two/three+ signs for one word) by making it check if the word has _e and if it does, just stripping _v1 etc. 
 IMPORTANT! 
-THINGS TO FIX: v_2 displayed even when not supposed to, optimize code cuz computer heats up after an hour.
+THINGS TO FIX:ptimize code cuz computer heats up after an hour.
