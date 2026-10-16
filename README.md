@@ -96,4 +96,4 @@ Day 44: I have, in fact, figured it out. Today I added live transcription. The a
 
 Day 45: I fixed the very logic. Previously, it was adding the emotions logic (adding the very prefix even though no _e). Now it doesn't do that and only applies it to words ending with _e.
 IMPORTANT! 
-THINGS TO FIX: very logic incorporated even into words, v_2 displayed even when not supposed to, optimize code cuz computer heats up after an hour.
+THINGS TO FIX: v_2 displayed even when not supposed to, optimize code cuz computer heats up after an hour.
