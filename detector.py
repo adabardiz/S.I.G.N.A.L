@@ -900,8 +900,8 @@ def main():
                     cv2.putText(frame, f"Holding (Sign/Word detecting)...", (20, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLOR_TEXT_DARK, 1, cv2.LINE_AA)
                     draw_progress_bar(frame, (20, 188), (220, 200), w_ratio, color=COLOR_SAGE)
 
-            draw_button(frame, (20, h - 95), (230, h - 60), COLOR_BG_CARD, "Change Voice Engine (popup)", text_color=COLOR_TEXT_DARK, font_scale=0.40)
-            draw_button(frame, (20, h - 50), (230, h - 15), COLOR_BG_CARD, "Controls (popup menu)", text_color=COLOR_TEXT_DARK, font_scale=0.40)
+            draw_button(frame, (20, h - 95), (230, h - 60), COLOR_BG_CARD, "Change Voice Engine", text_color=COLOR_TEXT_DARK, font_scale=0.40)
+            draw_button(frame, (20, h - 50), (230, h - 15), COLOR_BG_CARD, "Controls ", text_color=COLOR_TEXT_DARK, font_scale=0.40)
 
             if selecting_synonym:
                 box_w, box_h = 520, 160
