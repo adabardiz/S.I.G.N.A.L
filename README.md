@@ -99,3 +99,5 @@ Day 45: I fixed the very logic. Previously, it was adding the emotions logic (ad
 - pause vision models in transcription.
 - face mesh and pose models now sample every 3 frames (frame_counter % 3 == 0)
 - added a micro sleep target frame limiter so the cpu doesnt spin at %100 capacity when the cameras idel
+
+Day 46: I added 7 words & updated my main ASL words model. Tomorrow I'm going to look into deploying this.
