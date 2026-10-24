@@ -99,3 +99,5 @@ Day 43: I fixed the very logic. Previously, it was adding the emotions logic (ad
 Day 44: I added 7 words & updated my main ASL words model. Tomorrow I'm going to look into deploying this.
 
 Day 45: Added 6 words & wrote my personal project report.
+
+Day 46: Added 6 words.
