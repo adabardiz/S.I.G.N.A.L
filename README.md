@@ -101,3 +101,5 @@ Day 44: I added 7 words & updated my main ASL words model. Tomorrow I'm going to
 Day 45: Added 6 words & wrote my personal project report.
 
 Day 46: Added 6 words.
+
+Day 47: Added 7 words.
