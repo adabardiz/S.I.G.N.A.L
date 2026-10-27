@@ -103,3 +103,5 @@ Day 45: Added 6 words & wrote my personal project report.
 Day 46: Added 6 words.
 
 Day 47: Added 7 words.
+
+Day 48: Added 7 words. Mostly colors.
