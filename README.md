@@ -109,3 +109,5 @@ Day 48: Added 7 words. Mostly colors.
 Day 49: Added 6 words.
 
 Day 50: Added 6 words.
+
+Day 51: Added 5 words.
