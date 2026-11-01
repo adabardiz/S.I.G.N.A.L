@@ -111,3 +111,5 @@ Day 49: Added 6 words.
 Day 50: Added 6 words.
 
 Day 51: Added 5 words.
+
+Day 52: Added 6 words.
