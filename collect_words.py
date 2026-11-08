@@ -40,13 +40,9 @@ HAND_CONNECTIONS = [
 ]
 
 KEY_FACE_INDICES = [
-    1,
-    33, 133, 159, 145,
-    362, 263, 386, 374,
-    70, 63, 105, 66,
-    300, 293, 334, 296,
-    61, 291, 0, 17, 13, 14,
-    78, 308, 82, 312
+    1, 33, 133, 159, 145, 362, 263, 386, 374,
+    70, 63, 105, 66, 300, 293, 334, 296,
+    61, 291, 0, 17, 13, 14, 78, 308, 82, 312
 ]
 
 KEY_ARM_INDICES = [11, 12, 13, 14, 15, 16]
@@ -182,7 +178,7 @@ def main():
 
     pose_tracker = mp_pose.Pose(
         static_image_mode=False,
-        model_complexity=1,
+        model_complexity=0, 
         min_detection_confidence=0.50,
         min_tracking_confidence=0.50
     )
@@ -415,7 +411,8 @@ def main():
                 draw_rounded_rect(frame, (bar_x1, bar_y1), (bar_x1 + fill_w, bar_y2), COLOR_CORAL, thickness=-1, radius=9)
 
             cv2.imshow(window_name, frame)
-            cv2.waitKey(20)
+            
+            cv2.waitKey(1) 
 
         sample_row = [word_to_record] + sequence_features
         append_sample_to_csv(csv_file, sample_row)
