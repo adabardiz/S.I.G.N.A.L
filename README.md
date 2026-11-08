@@ -117,3 +117,5 @@ Day 52: Added 6 words.
 Day 53: Added 3 words.
 
 Day 54: Added 2 words. I have to fix the timeout error the collect_words.py file gives me because it's really hindering my progress.
+
+Day 55: Fixed lag & timing out issues (optimized the machine, in short), and added 6 words.
