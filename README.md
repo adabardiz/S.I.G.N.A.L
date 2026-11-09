@@ -119,3 +119,7 @@ Day 53: Added 3 words.
 Day 54: Added 2 words. I have to fix the timeout error the collect_words.py file gives me because it's really hindering my progress.
 
 Day 55: Fixed lag & timing out issues (optimized the machine, in short), and added 6 words.
+
+Day 56: Added 5 words.
+
+IDEAS FOR THE FUTURE: Make it so that you can pick which two hands to focus on in detector.py bcuz theres not always going to be just one person in the room. Also fix the fact that it doesnt pronounce the word at the end in detector.py
