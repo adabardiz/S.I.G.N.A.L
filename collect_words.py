@@ -5,14 +5,15 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import cv2
 import numpy as np
 import mediapipe as mp
-import mediapipe.python.solutions.face_mesh as mp_face_mesh
-import mediapipe.python.solutions.pose as mp_pose
+
+mp_face_mesh = mp.solutions.face_mesh
+mp_pose = mp.solutions.pose
+
 import time
 import csv
 import os
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
-
 try:
     from train_model import extract_hand_features
 except ImportError:
