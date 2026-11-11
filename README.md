@@ -2,7 +2,6 @@ S.I.G.N.A.L (Sign Interpretation & Gesture Network Algorithm)
 
 An algorithm that detects sign language, turns it into text (and also reads out individual signs) and then turns it into speech by combining all signs into a logical sentence. (asl Grammar is different from normal spoken grammar so the last step is necessary)
 
-UPDATES DAILY (hopefully)
 
 Daily log:
 
@@ -122,4 +121,5 @@ Day 55: Fixed lag & timing out issues (optimized the machine, in short), and add
 
 Day 56: Added 5 words.
 
+Day 57: Added 3 words & fixed mediapipe as Google's new update literally wrecked my system. LET EXAMS BE OVER SO I CAN MAKE PROPER UPDATES
 IDEAS FOR THE FUTURE: Make it so that you can pick which two hands to focus on in detector.py bcuz theres not always going to be just one person in the room. Also fix the fact that it doesnt pronounce the word at the end in detector.py
