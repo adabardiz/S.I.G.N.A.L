@@ -228,13 +228,19 @@ def draw_wrapped_text(img, text, pos, max_width, font, font_scale, color, thickn
 
 class TextToSpeechEngine:
     def __init__(self):
-        self.voices = ["Voice 1 (Neutral)", "Voice 2 (Expressive)", "Voice 3 (Soft)"]
+        self.voices = ["Alex", "Samantha", "Fred"]
         self.voice_idx = 0
         self.current_voice_label = self.voices[self.voice_idx]
 
     def speak(self, text, tone="neutral", intensity=1.0):
         intensity_tag = f" [{intensity}x]" if intensity > 1.2 else ""
         print(f"[TTS ({self.current_voice_label} | {tone}){intensity_tag}]: {text}")
+        
+        def play_audio():
+            clean_text = text.replace('"', '').replace("'", "")
+            os.system(f'say -v {self.current_voice_label} "{clean_text}"')
+            
+        threading.Thread(target=play_audio, daemon=True).start()
 
     def select_voice(self, idx):
         if 0 <= idx < len(self.voices):
