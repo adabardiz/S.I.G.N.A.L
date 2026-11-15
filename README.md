@@ -127,4 +127,6 @@ Day 58: One exam left! Added 5 words.
 
 Day 59: Fixed pronounciation (it wasn't pronouncing the words at the end before). Added 3 words.
 
+Day 60: Added 5 words.
+
 IDEAS FOR THE FUTURE: Make it so that you can pick which two hands to focus on in detector.py bcuz theres not always going to be just one person in the room. 
