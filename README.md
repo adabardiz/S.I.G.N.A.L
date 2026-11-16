@@ -129,6 +129,6 @@ Day 59: Fixed pronounciation (it wasn't pronouncing the words at the end before)
 
 Day 60: Added 5 words.
 
-Day 61: Added 7 words -> finished the entirety of the playlist i started on day one of collecting words. (https://www.youtube.com/watch?v=S4phzFQKzAc&list=PLMN7QCuj6dfYFq2d8CrautQ--BmczT-xv&index=7)
+Day 61: Added 7 words -> finished the entirety of the playlist i started on day one of collecting words. (https://www.youtube.com/watch?v=S4phzFQKzAc&list=PLMN7QCuj6dfYFq2d8CrautQ--BmczT-xv&index=7) added a back button in the punctuation tone step, a “Refining sentence...” indicator while the tense conversion runs. Word-mode synonym choices now support up to 3 options instead of 2. I also asked claude to redesign my UI -> it is now beautiful, might I say.
 
 IDEAS FOR THE FUTURE: Make it so that you can pick which two hands to focus on in detector.py bcuz theres not always going to be just one person in the room. 
