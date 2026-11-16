@@ -103,7 +103,7 @@ Day 46: Added 6 words.
 
 Day 47: Added 7 words.
 
-Day 48: Added 7 words. Mostly colors.
+Day 48: Added 7 words. 
 
 Day 49: Added 6 words.
 
@@ -128,5 +128,7 @@ Day 58: One exam left! Added 5 words.
 Day 59: Fixed pronounciation (it wasn't pronouncing the words at the end before). Added 3 words.
 
 Day 60: Added 5 words.
+
+Day 61: Added 7 words -> finished the entirety of the playlist i started on day one of collecting words. (https://www.youtube.com/watch?v=S4phzFQKzAc&list=PLMN7QCuj6dfYFq2d8CrautQ--BmczT-xv&index=7)
 
 IDEAS FOR THE FUTURE: Make it so that you can pick which two hands to focus on in detector.py bcuz theres not always going to be just one person in the room. 
