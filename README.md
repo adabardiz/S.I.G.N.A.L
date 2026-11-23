@@ -133,5 +133,7 @@ Day 61: Added 7 words -> finished the entirety of the playlist i started on day 
 
 Day 62: Added 4 words and finished https://www.youtube.com/watch?v=G6hVRVG74lc
 
+Day 63: Added 6 words that are all verbs.
+
 
 IDEAS FOR THE FUTURE: Make it so that you can pick which two hands to focus on in detector.py bcuz theres not always going to be just one person in the room. 
