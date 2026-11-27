@@ -137,5 +137,6 @@ Day 63: Added 6 words that are all verbs.
 
 Day 64: Added 5 words.
 
+Day 65: Added 2 words.
 
 IDEAS FOR THE FUTURE: Make it so that you can pick which two hands to focus on in detector.py bcuz theres not always going to be just one person in the room. 
